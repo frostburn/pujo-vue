@@ -1,6 +1,48 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
+import { onMounted, onUnmounted } from 'vue';
+import { useWebSocketStore } from '@/stores/websocket'
+
+const websocket = useWebSocketStore();
+
+function requestGame() {
+  websocket.requestGame();
+}
+
+function requestState() {
+  websocket.requestState();
+}
+
+function onMessage(message: any) {
+  if (message.type === "simple state") {
+    websocket.makeMove(0, 1, 0);
+  }
+
+  if (message.type === "game result") {
+    console.log(message.result, message.reason);
+  }
+}
+
+onMounted(() => {
+  console.log("Mounted the app");
+
+  const socket = new WebSocket("ws://localhost:3003");
+
+  websocket.addOpenListener(requestGame);
+  websocket.addMessageListener(onMessage);
+
+  websocket.assign(socket);
+});
+
+onUnmounted(() => {
+  console.log("Unmounted the app");
+
+  websocket.removeOpenListener(requestGame);
+  websocket.removeMessageListener(onMessage);
+
+  websocket.unassign();
+});
 </script>
 
 <template>
@@ -9,7 +51,7 @@ import HelloWorld from './components/HelloWorld.vue'
 
     <div class="wrapper">
       <HelloWorld msg="You did it!" />
-
+      <button @click="requestState">Play default move</button>
       <nav>
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/about">About</RouterLink>
