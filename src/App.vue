@@ -3,6 +3,7 @@ import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
 import { onMounted, onUnmounted } from 'vue';
 import { useWebSocketStore } from '@/stores/websocket'
+import { SimpleGame } from 'pujo-puyo-core';
 
 const websocket = useWebSocketStore();
 
@@ -16,11 +17,14 @@ function requestState() {
 
 function onMessage(message: any) {
   if (message.type === "simple state") {
-    websocket.makeMove(0, 1, 0);
+    const game = SimpleGame.fromJSON(message.state);
+    game.log();
+    websocket.makeMove(0, 2, 0);
   }
 
   if (message.type === "game result") {
     console.log(message.result, message.reason);
+    websocket.requestGame();
   }
 }
 
