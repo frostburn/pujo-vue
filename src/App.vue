@@ -51,7 +51,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PlayingField />
+  <div class="field-container">
+    <PlayingField />
+  </div>
 </template>
 
 <style scoped>
@@ -60,9 +62,9 @@ header {
   max-height: 100vh;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.field-container {
+  height: 800px;
+  width: 1000px;
 }
 
 nav {
@@ -95,10 +97,6 @@ nav a:first-of-type {
     display: flex;
     place-items: center;
     padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
   }
 
   header .wrapper {
