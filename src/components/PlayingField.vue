@@ -13,10 +13,8 @@ import {
   YELLOW,
   combinedGarbageDisplay
 } from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, type SVGAttributes } from 'vue'
 import SVGDefs from './SVGDefs.vue'
-
-// TODO: Ghost panels
 
 // Frames per millisecond
 const GAME_FRAME_RATE = 30 / 1000
@@ -125,12 +123,50 @@ function getFill(colorIndex: number) {
   return 'magenta'
 }
 
+const ghostAttrss = computed(() => {
+  const result = []
+  let xOffset = LEFT_SCREEN_X
+  for (const state of gameState.value) {
+    const screen = state.screen
+    const panels: SVGAttributes[] = []
+    for (let index = WIDTH * GHOST_Y; index < WIDTH * (GHOST_Y + 1); ++index) {
+      const x = (index % WIDTH) + 0.5 + xOffset
+      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
+      let stroke = getStroke(screen.grid[index])
+      if (screen.falling[index]) {
+        y += fallMu.value
+      }
+      let href = ''
+      if (screen.grid[index] === GARBAGE) {
+        href = '#garbage'
+      } else if (screen.grid[index] >= 0) {
+        href = '#panel0'
+      }
+      panels.push({
+        href,
+        x,
+        y,
+        fill: 'none',
+        stroke,
+        'stroke-width': STROKE_WIDTH * 0.5,
+        'stroke-dasharray': '0.1 0.108',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        mask: 'url(#fade-mask)'
+      })
+    }
+    result.push(panels)
+    xOffset = RIGHT_SCREEN_X
+  }
+  return result
+})
+
 const panelAttrss = computed(() => {
   const result = []
   let xOffset = LEFT_SCREEN_X
   for (const state of gameState.value) {
     const screen = state.screen
-    const panels = []
+    const panels: SVGAttributes[] = []
     for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
       const x = (index % WIDTH) + 0.5 + xOffset
       let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
@@ -159,7 +195,6 @@ const panelAttrss = computed(() => {
         }
       }
       panels.push({
-        key: index,
         href,
         x,
         y,
@@ -194,7 +229,7 @@ const panelGlyphAttrss = computed(() => {
   let xOffset = LEFT_SCREEN_X
   for (const state of gameState.value) {
     const screen = state.screen
-    const glyphs = []
+    const glyphs: SVGAttributes[] = []
     for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
       const x = (index % WIDTH) + 0.5 + xOffset
       let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
@@ -207,7 +242,6 @@ const panelGlyphAttrss = computed(() => {
         href = ''
       }
       glyphs.push({
-        key: index,
         href,
         x,
         y,
@@ -234,7 +268,7 @@ const previewSymbols = computed(() =>
 )
 
 const garbageGlyphss = computed(() => {
-  const result = []
+  const result: SVGAttributes[][] = []
   for (const state of gameState.value) {
     result.push(
       combinedGarbageDisplay(state.pendingGarbage, state.lateGarbage).map((symbol) => {
@@ -259,12 +293,16 @@ const garbageGlyphss = computed(() => {
 <template>
   <svg width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
     <SVGDefs />
+    <!--Ghost panels go behind the screens-->
+    <template v-for="(ghostAttrs, playerIndex) in ghostAttrss" :key="playerIndex">
+      <use v-for="(attrs, i) in ghostAttrs" v-bind="attrs" :key="i"></use>
+    </template>
     <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
     <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
       <!--Playing grid-->
-      <use v-for="attrs in panelAttrs" v-bind="attrs" :key="attrs.key"></use>
-      <use v-for="attrs in panelGlyphAttrss[playerIndex]" v-bind="attrs" :key="attrs.key"></use>
+      <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i"></use>
+      <use v-for="(attrs, i) in panelGlyphAttrss[playerIndex]" v-bind="attrs" :key="i"></use>
       <!--Piece preview-->
       <g :stroke-width="STROKE_WIDTH">
         <use
