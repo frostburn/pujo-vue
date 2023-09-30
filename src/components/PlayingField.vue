@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { HEIGHT, MultiplayerGame, WIDTH } from 'pujo-puyo-core';
+import { GHOST_Y, MultiplayerGame, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import SVGDefs from './SVGDefs.vue';
 
 // Frames per millisecond
 const GAME_FRAME_RATE = 30 / 1000;
@@ -107,10 +108,13 @@ const puyoPropss = computed(() => {
     const result = [];
     for (const playerState of gameState.value) {
         const playerPuyos = [];
-        let index = 0;
-        for (const colorIndex of playerState.screen.grid) {
-            let y = Math.floor(index / WIDTH);
+        let index = WIDTH * GHOST_Y;
+        for (const colorIndex of playerState.screen.grid.slice(WIDTH * GHOST_Y)) {
+            let y = Math.floor(index / WIDTH) - GHOST_Y;
             let fill = getFill(colorIndex);
+            if (y === 0 && fill !== "none") {
+                fill = "rgba(100, 100, 100, 0.5)";
+            }
             let stroke = getStroke(colorIndex);
             if (playerState.screen.falling[index]) {
                 y += fallMu.value;
@@ -132,23 +136,56 @@ const puyoPropss = computed(() => {
     return result;
 });
 
+const previewFills = computed(() => gameState.value.map(state => state.visibleBag.slice(-4).map(i => FILLS[i])));
+
+const LEFT_SCREEN_X = 1;
+const RIGHT_SCREEN_X = 11;
+const SCREEN_Y = 1;
+
 </script>
 
 <template>
-  <svg width="100%" height="100%" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+  <svg width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
+    <SVGDefs />
+    <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
+    <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
     <template v-for="puyoProps, playerIndex in puyoPropss" :key="playerIndex">
         <circle 
             v-for="p in puyoProps"
             r="0.4"
             stroke-width="0.1"
             :key="p.index"
-            :cx="1 + 9 * playerIndex + p.x"
-            :cy="1 + p.y"
+            :cx="p.x + 0.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+            :cy="p.y - 0.5 + SCREEN_Y"
             :fill="p.fill"
             :stroke="p.stroke"
         >
         </circle>
-        <text :x="1 + 9 * playerIndex" :y="2 + HEIGHT">
+        <circle
+            r="0.4"
+            :cx="WIDTH + 1.0 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+            cy="2.5"
+            :fill="previewFills[playerIndex][0]"
+        ></circle>
+        <circle
+            r="0.4"
+            :cx="WIDTH + 1.0 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+            cy="1.5"
+            :fill="previewFills[playerIndex][1]"
+        ></circle>
+        <circle
+            r="0.4"
+            :cx="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+            cy="4.7"
+            :fill="previewFills[playerIndex][2]"
+        ></circle>
+        <circle
+            r="0.4"
+            :cx="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+            cy="3.7"
+            :fill="previewFills[playerIndex][3]"
+        ></circle>
+        <text :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X" :y="2 + VISIBLE_HEIGHT">
             <tspan class="score-label">Score: </tspan>
             <tspan class="score">{{ gameState[playerIndex].score }}</tspan>
         </text>
