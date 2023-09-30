@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { GHOST_Y, MultiplayerGame, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import {
+  GARBAGE,
+  GHOST_Y,
+  MultiplayerGame,
+  VISIBLE_HEIGHT,
+  WIDTH,
+  combinedGarbageDisplay
+} from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 
@@ -83,8 +90,14 @@ onUnmounted(() => {
   }
 })
 
+// Graphics
+
+const LEFT_SCREEN_X = 1
+const RIGHT_SCREEN_X = 11
+const SCREEN_Y = 1
 const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
 const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
+const STROKE_WIDTH = 0.15
 
 function getStroke(colorIndex: number) {
   if (colorIndex < 0) {
@@ -120,7 +133,7 @@ const puyoPropss = computed(() => {
         y += fallMu.value
       }
       if (playerState.screen.ignited[index]) {
-        fill = 'white'
+        fill = '#eed'
       }
       playerPuyos.push({
         index,
@@ -140,9 +153,27 @@ const previewFills = computed(() =>
   gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => FILLS[i]))
 )
 
-const LEFT_SCREEN_X = 1
-const RIGHT_SCREEN_X = 11
-const SCREEN_Y = 1
+const garbageGlyphss = computed(() => {
+  const result = []
+  for (const state of gameState.value) {
+    result.push(
+      combinedGarbageDisplay(state.pendingGarbage, state.lateGarbage).map((symbol) => {
+        if (symbol === 'rock') {
+          symbol = 'spade'
+        } else if (symbol === 'crown') {
+          symbol = 'diamond'
+        }
+        return {
+          href: `#${symbol}`,
+          fill: FILLS[GARBAGE],
+          stroke: STROKES[GARBAGE],
+          'stroke-width': STROKE_WIDTH
+        }
+      })
+    )
+  }
+  return result
+})
 </script>
 
 <template>
@@ -151,6 +182,7 @@ const SCREEN_Y = 1
     <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
     <template v-for="(puyoProps, playerIndex) in puyoPropss" :key="playerIndex">
+      <!--Playing grid-->
       <circle
         v-for="p in puyoProps"
         r="0.4"
@@ -161,6 +193,7 @@ const SCREEN_Y = 1
         :fill="p.fill"
         :stroke="p.stroke"
       ></circle>
+      <!--Piece preview-->
       <circle
         r="0.4"
         :cx="WIDTH + 1.0 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
@@ -185,6 +218,15 @@ const SCREEN_Y = 1
         cy="3.7"
         :fill="previewFills[playerIndex][3]"
       ></circle>
+      <!--Garbage queue-->
+      <use
+        v-for="(attrs, i) in garbageGlyphss[playerIndex]"
+        :key="i"
+        v-bind="attrs"
+        :x="i + 0.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+        y="0"
+      ></use>
+      <!--Score-->
       <text :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X" :y="2 + VISIBLE_HEIGHT">
         <tspan class="score-label">Score:</tspan>
         <tspan class="score">{{ gameState[playerIndex].score }}</tspan>
