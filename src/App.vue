@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PlayingField from './components/PlayingField.vue';
+import PlayingField from './components/PlayingField.vue'
 
 /*
 import { onMounted, onUnmounted } from 'vue';
