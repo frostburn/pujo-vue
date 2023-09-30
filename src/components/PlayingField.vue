@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import {
+  BLUE,
   GARBAGE,
   GHOST_Y,
+  GREEN,
+  HEIGHT,
   MultiplayerGame,
+  PURPLE,
+  RED,
   VISIBLE_HEIGHT,
   WIDTH,
+  YELLOW,
   combinedGarbageDisplay
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
+
+// TODO: Ghost panels
 
 // Frames per millisecond
 const GAME_FRAME_RATE = 30 / 1000
@@ -117,40 +125,112 @@ function getFill(colorIndex: number) {
   return 'magenta'
 }
 
-const puyoPropss = computed(() => {
+const panelAttrss = computed(() => {
   const result = []
-  for (const playerState of gameState.value) {
-    const playerPuyos = []
-    let index = WIDTH * GHOST_Y
-    for (const colorIndex of playerState.screen.grid.slice(WIDTH * GHOST_Y)) {
-      let y = Math.floor(index / WIDTH) - GHOST_Y
-      let fill = getFill(colorIndex)
-      if (y === 0 && fill !== 'none') {
-        fill = 'rgba(100, 100, 100, 0.5)'
-      }
-      let stroke = getStroke(colorIndex)
-      if (playerState.screen.falling[index]) {
+  let xOffset = LEFT_SCREEN_X
+  for (const state of gameState.value) {
+    const screen = state.screen
+    const panels = []
+    for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
+      const x = (index % WIDTH) + 0.5 + xOffset
+      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
+      let fill = getFill(screen.grid[index])
+      let stroke = getStroke(screen.grid[index])
+      if (screen.falling[index]) {
         y += fallMu.value
       }
-      if (playerState.screen.ignited[index]) {
+      if (screen.ignited[index]) {
         fill = '#eed'
       }
-      playerPuyos.push({
-        index,
-        x: index % WIDTH,
+      let href = ''
+      if (screen.grid[index] === GARBAGE) {
+        if (screen.jiggling[index]) {
+          href = '#jiggling-garbage'
+        } else {
+          href = '#garbage'
+        }
+      } else if (screen.grid[index] >= 0) {
+        if (screen.sparking[index]) {
+          href = '#sparks'
+          fill = stroke
+          stroke = 'none'
+        } else {
+          href = `#panel${screen.connectivity[index]}`
+        }
+      }
+      panels.push({
+        key: index,
+        href,
+        x,
         y,
         fill,
-        stroke
+        stroke,
+        'stroke-width': STROKE_WIDTH
       })
-      index++
     }
-    result.push(playerPuyos)
+    result.push(panels)
+    xOffset = RIGHT_SCREEN_X
+  }
+  return result
+})
+
+function panelSymbol(color: number, jiggle = false) {
+  if (color === RED) {
+    return jiggle ? '#jiggling-heart' : '#heart'
+  } else if (color === GREEN) {
+    return jiggle ? '#jiggling-circle' : '#small-circle'
+  } else if (color === YELLOW) {
+    return jiggle ? '#jiggling-star' : '#small-star'
+  } else if (color === BLUE) {
+    return jiggle ? '#jiggling-moon' : '#small-moon'
+  } else if (color === PURPLE) {
+    return jiggle ? '#jiggling-diamond' : '#small-diamond'
+  }
+  return ''
+}
+
+const panelGlyphAttrss = computed(() => {
+  const result = []
+  let xOffset = LEFT_SCREEN_X
+  for (const state of gameState.value) {
+    const screen = state.screen
+    const glyphs = []
+    for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
+      const x = (index % WIDTH) + 0.5 + xOffset
+      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
+      let fill = getStroke(screen.grid[index])
+      if (screen.falling[index]) {
+        y += fallMu.value
+      }
+      let href = panelSymbol(screen.grid[index], screen.jiggling[index])
+      if (screen.sparking[index]) {
+        href = ''
+      }
+      glyphs.push({
+        key: index,
+        href,
+        x,
+        y,
+        fill,
+        stroke: 'none'
+      })
+    }
+    result.push(glyphs)
+    xOffset = RIGHT_SCREEN_X
   }
   return result
 })
 
 const previewFills = computed(() =>
   gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => FILLS[i]))
+)
+
+const previewStrokes = computed(() =>
+  gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => STROKES[i]))
+)
+
+const previewSymbols = computed(() =>
+  gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => panelSymbol(i)))
 )
 
 const garbageGlyphss = computed(() => {
@@ -181,43 +261,72 @@ const garbageGlyphss = computed(() => {
     <SVGDefs />
     <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
-    <template v-for="(puyoProps, playerIndex) in puyoPropss" :key="playerIndex">
+    <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
       <!--Playing grid-->
-      <circle
-        v-for="p in puyoProps"
-        r="0.4"
-        stroke-width="0.1"
-        :key="p.index"
-        :cx="p.x + 0.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        :cy="p.y - 0.5 + SCREEN_Y"
-        :fill="p.fill"
-        :stroke="p.stroke"
-      ></circle>
+      <use v-for="attrs in panelAttrs" v-bind="attrs" :key="attrs.key"></use>
+      <use v-for="attrs in panelGlyphAttrss[playerIndex]" v-bind="attrs" :key="attrs.key"></use>
       <!--Piece preview-->
-      <circle
-        r="0.4"
-        :cx="WIDTH + 1.0 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        cy="2.5"
-        :fill="previewFills[playerIndex][0]"
-      ></circle>
-      <circle
-        r="0.4"
-        :cx="WIDTH + 1.0 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        cy="1.5"
-        :fill="previewFills[playerIndex][1]"
-      ></circle>
-      <circle
-        r="0.4"
-        :cx="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        cy="4.7"
-        :fill="previewFills[playerIndex][2]"
-      ></circle>
-      <circle
-        r="0.4"
-        :cx="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        cy="3.7"
-        :fill="previewFills[playerIndex][3]"
-      ></circle>
+      <g :stroke-width="STROKE_WIDTH">
+        <use
+          href="#panel0"
+          y="2.5"
+          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :fill="previewFills[playerIndex][0]"
+          :stroke="previewStrokes[playerIndex][0]"
+        ></use>
+        <use
+          y="2.5"
+          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :href="previewSymbols[playerIndex][0]"
+          :fill="previewStrokes[playerIndex][0]"
+          stroke="none"
+        ></use>
+
+        <use
+          href="#panel0"
+          y="1.5"
+          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :fill="previewFills[playerIndex][1]"
+          :stroke="previewStrokes[playerIndex][1]"
+        ></use>
+        <use
+          y="1.5"
+          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :href="previewSymbols[playerIndex][1]"
+          :fill="previewStrokes[playerIndex][1]"
+          stroke="none"
+        ></use>
+
+        <use
+          href="#panel0"
+          y="4.7"
+          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :fill="previewFills[playerIndex][2]"
+          :stroke="previewStrokes[playerIndex][2]"
+        ></use>
+        <use
+          y="4.7"
+          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :href="previewSymbols[playerIndex][2]"
+          :fill="previewStrokes[playerIndex][2]"
+          stroke="none"
+        ></use>
+
+        <use
+          href="#panel0"
+          y="3.7"
+          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :fill="previewFills[playerIndex][3]"
+          :stroke="previewStrokes[playerIndex][3]"
+        ></use>
+        <use
+          y="3.7"
+          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
+          :href="previewSymbols[playerIndex][3]"
+          :fill="previewStrokes[playerIndex][3]"
+          stroke="none"
+        ></use>
+      </g>
       <!--Garbage queue-->
       <use
         v-for="(attrs, i) in garbageGlyphss[playerIndex]"

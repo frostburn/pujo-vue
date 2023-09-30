@@ -1,6 +1,14 @@
 <script setup lang="ts">
+import JiggleAnimation from './JiggleAnimation.vue'
 import { transformPath } from '@/util'
-import { VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import {
+  CONNECTS_DOWN,
+  CONNECTS_LEFT,
+  CONNECTS_RIGHT,
+  CONNECTS_UP,
+  VISIBLE_HEIGHT,
+  WIDTH
+} from 'pujo-puyo-core'
 
 const pieceBoxD = transformPath(
   'M -0.1 0 ' +
@@ -73,7 +81,71 @@ const cometD = transformPath(
   -0.15
 )
 
-const pieceBoxTransform = `translate(${WIDTH + 0.5}, 0)`
+// Panels
+
+const connectedPanels: { id: string; points: string; 'clip-path': string }[] = []
+for (let i = 0; i < 16; ++i) {
+  let points = [
+    [0.4, 0.3],
+    [0.3, 0.4]
+  ]
+  if (i & CONNECTS_DOWN) {
+    points = points.concat([
+      [0.3, 0.6],
+      [0.4, 0.7],
+      [-0.4, 0.7],
+      [-0.3, 0.6]
+    ])
+  }
+  points = points.concat([
+    [-0.3, 0.4],
+    [-0.4, 0.3]
+  ])
+  if (i & CONNECTS_LEFT) {
+    points = points.concat([
+      [-0.6, 0.3],
+      [-0.7, 0.4],
+      [-0.7, -0.4],
+      [-0.6, -0.3]
+    ])
+  }
+  points = points.concat([
+    [-0.4, -0.3],
+    [-0.3, -0.4]
+  ])
+  if (i & CONNECTS_UP) {
+    points = points.concat([
+      [-0.3, -0.6],
+      [-0.4, -0.7],
+      [0.4, -0.7],
+      [0.3, -0.6]
+    ])
+  }
+  points = points.concat([
+    [0.3, -0.4],
+    [0.4, -0.3]
+  ])
+  if (i & CONNECTS_RIGHT) {
+    points = points.concat([
+      [0.6, -0.3],
+      [0.7, -0.4],
+      [0.7, 0.4],
+      [0.6, 0.3]
+    ])
+  }
+
+  connectedPanels.push({
+    id: `panel${i}`,
+    points: points.map((pair) => pair.join(',')).join(' '),
+    'clip-path': 'url(#square)'
+  })
+}
+
+// Panel identifiers
+const heartD = transformPath('M 0 1 C 1.8 0 0 -1 0 0 C 0 -1 -1.8 0 0 1 Z', 0.3, -0.01, -0.07)
+const smallStarD = transformPath(starD, -0.6, 0, -0.015)
+const smallMoonD = transformPath(moonD, -0.6)
+const smallDiamondD = transformPath(diamondD, -0.6)
 </script>
 
 <template>
@@ -131,6 +203,51 @@ const pieceBoxTransform = `translate(${WIDTH + 0.5}, 0)`
       <path id="moon" :d="moonD"></path>
       <path id="diamond" :d="diamondD"></path>
       <path id="comet" :d="cometD"></path>
+
+      <!--In-grid Garbage-->
+      <circle id="garbage" r="0.414"></circle>
+      <ellipse id="jiggling-garbage" rx="0.39" ry="0.414">
+        <animate
+          attributeName="rx"
+          values="0.39;0.414;0.39"
+          dur="0.25s"
+          repeatCount="indefinite"
+        ></animate>
+        <animate
+          attributeName="ry"
+          values="0.414;0.39;0.414"
+          dur="0.25s"
+          repeatCount="indefinite"
+        ></animate>
+      </ellipse>
+
+      <!--Panels-->
+      <clipPath id="square">
+        <rect x="-0.505" y="-0.505" width="1.1" height="1.1"></rect>
+      </clipPath>
+      <polygon v-for="(attrs, i) in connectedPanels" :key="i" v-bind="attrs"></polygon>
+
+      <!--Panel identifiers-->
+      <path id="heart" :d="heartD"></path>
+      <use id="jiggling-heart" href="#heart">
+        <JiggleAnimation />
+      </use>
+      <path id="small-star" :d="smallStarD"></path>
+      <use id="jiggling-star" href="#small-star">
+        <JiggleAnimation />
+      </use>
+      <circle id="small-circle" r="0.2"></circle>
+      <use id="jiggling-circle" href="#small-circle">
+        <JiggleAnimation />
+      </use>
+      <path id="small-moon" :d="smallMoonD"></path>
+      <use id="jiggling-moon" href="#small-moon">
+        <JiggleAnimation />
+      </use>
+      <path id="small-diamond" :d="smallDiamondD"></path>
+      <use id="jiggling-diamond" href="#small-diamond">
+        <JiggleAnimation />
+      </use>
     </defs>
   </svg>
 </template>
