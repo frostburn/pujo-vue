@@ -39,17 +39,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
     const socket = webSocket.value
     if (socket === null) {
       console.warn('No WebSocket assigned')
-      return false
+      return true
     }
     if (socket.readyState !== 1) {
       console.warn('WebSocket not ready yet')
-      return false
+      return true
     }
-    return true
+    return false
   }
 
   function requestGame() {
-    if (!guard()) {
+    if (guard()) {
       return
     }
     const socket = webSocket.value!
@@ -57,19 +57,19 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function requestState() {
-    if (!guard()) {
+    if (guard()) {
       return
     }
     const socket = webSocket.value!
     socket.send(JSON.stringify({ type: 'simple state request' }))
   }
 
-  function makeMove(x1: number, y1: number, orientation: number) {
-    if (!guard()) {
+  function makeMove(x1: number, y1: number, orientation: number, kickDown = false) {
+    if (guard()) {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation }))
+    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, kickDown }))
   }
 
   function addOpenListener(listener: OpenListener) {

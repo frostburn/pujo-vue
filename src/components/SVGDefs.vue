@@ -248,6 +248,12 @@ const smallDiamondD = transformPath(diamondD, -0.6)
       <use id="jiggling-diamond" href="#small-diamond">
         <JiggleAnimation />
       </use>
+
+      <!--Missing panel identifier-->
+      <polygon
+        id="cross"
+        points="0,0.1 0.1,0.2 0.2,0.1 0.1,0 0.2,-0.1 0.1,-0.2 0,-0.1 -0.1,-0.2 -0.2,-0.1 -0.1,0, -0.2,0.1 -0.1,0.2"
+      ></polygon>
     </defs>
   </svg>
 </template>

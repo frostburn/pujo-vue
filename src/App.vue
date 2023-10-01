@@ -1,53 +1,35 @@
 <script setup lang="ts">
 import PlayingField from './components/PlayingField.vue'
 
-/*
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
-import { SimpleGame } from 'pujo-puyo-core';
-const websocket = useWebSocketStore();
 
-function requestGame() {
-  websocket.requestGame();
-}
+const WS_URL = 'ws://localhost:3003'
 
-function requestState() {
-  websocket.requestState();
-}
+const websocket = useWebSocketStore()
 
-function onMessage(message: any) {
-  if (message.type === "simple state") {
-    const game = SimpleGame.fromJSON(message.state);
-    game.log();
-    websocket.makeMove(0, 2, 0);
-  }
-
-  if (message.type === "game result") {
-    console.log(message.result, message.reason);
-    websocket.requestGame();
-  }
+function hello() {
+  console.log(`Websocket opened to ${WS_URL}`)
+  websocket.requestGame()
 }
 
 onMounted(() => {
-  console.log("Mounted the app");
+  console.log('Mounted the app')
 
-  const socket = new WebSocket("ws://localhost:3003");
+  const socket = new WebSocket(WS_URL)
 
-  websocket.addOpenListener(requestGame);
-  websocket.addMessageListener(onMessage);
+  websocket.addOpenListener(hello)
 
-  websocket.assign(socket);
-});
+  websocket.assign(socket)
+})
 
 onUnmounted(() => {
-  console.log("Unmounted the app");
+  console.log('Unmounted the app')
 
-  websocket.removeOpenListener(requestGame);
-  websocket.removeMessageListener(onMessage);
+  websocket.removeOpenListener(hello)
 
-  websocket.unassign();
-});
-*/
+  websocket.unassign()
+})
 </script>
 
 <template>
