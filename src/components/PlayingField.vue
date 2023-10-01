@@ -4,6 +4,7 @@ import {
   GARBAGE,
   GHOST_Y,
   GREEN,
+  type GameState,
   HEIGHT,
   MultiplayerGame,
   PURPLE,
@@ -15,18 +16,76 @@ import {
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, type SVGAttributes } from 'vue'
 import SVGDefs from './SVGDefs.vue'
+import { useWebSocketStore } from '@/stores/websocket'
+
+type Move = {
+  player: number
+  x1: number
+  y1: number
+  orientation: number
+  kickDown: boolean
+}
+
+const GAME_TYPE: string = 'pausing'
+
+// Server connection
+
+const websocket = useWebSocketStore()
+
+const LOG = false
+
+let identity: number | null = null
+
+let moveSent = false
+
+const bagQueues: number[][][] = [[], []]
+
+const moveQueues: Move[][] = [[], []]
+
+// The main App is responsible for requesting the game once everything has mounted and the connection has been established.
+function onMessage(message: any) {
+  if (LOG) {
+    console.log(message)
+  }
+  if (message.type === 'identity') {
+    identity = message.player
+  }
+  if (message.type === 'game params') {
+    mirrorGame = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    bagQueues.forEach((queue) => (queue.length = 0))
+    moveQueues.forEach((queue) => (queue.length = 0))
+    gameAge = 0
+    gameStart = null
+    tickId = window.setTimeout(tick, 1)
+  }
+  if (message.type === 'bag') {
+    bagQueues[message.player].push(message.bag)
+    // Bags are unloaded before each move so this is just for the visuals
+    if (message.player === identity) {
+      moveSent = false
+      mirrorGame!.games[message.player].bag = message.bag
+    }
+  }
+  if (message.type === 'move') {
+    moveQueues[message.player].push(message)
+  }
+  if (message.type === 'game result') {
+    websocket.requestGame()
+  }
+}
 
 // Frames per millisecond
-const GAME_FRAME_RATE = 30 / 1000
+const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
 const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 
-const game = new MultiplayerGame()
+// This is merely a mirror driven by the server.
+let mirrorGame: MultiplayerGame | null = null
 
 let tickId: number | null = null
 
 let gameAge = 0
-let gameStart: null | DOMHighResTimeStamp = null
-let lastTickTime: number | null = null
+let gameStart: DOMHighResTimeStamp | null = null
+let lastTickTime: DOMHighResTimeStamp | null = null
 
 // Game logic goes here and runs independent of animation.
 function tick() {
@@ -34,14 +93,30 @@ function tick() {
   if (gameStart === null) {
     gameStart = timeStamp
   }
+
+  for (let i = 0; i < moveQueues.length; ++i) {
+    if (!mirrorGame!.games[i].busy && moveQueues[i].length) {
+      const move = moveQueues[i].shift()!
+      const bag = bagQueues[i].shift()
+      if (bag === undefined) {
+        throw new Error('Bag queue desync')
+      }
+      mirrorGame!.games[i].bag = bag
+      mirrorGame!.play(move.player, move.x1, move.y1, move.orientation, move.kickDown)
+    }
+  }
+
+  if (!mirrorGame!.games[identity!].busy && !moveSent) {
+    // Make random moves just to demonstrate.
+    websocket.makeMove(Math.floor(Math.random() * WIDTH), 2, 0)
+    moveSent = true
+  }
+
   const intendedAge = (timeStamp - gameStart) * GAME_FRAME_RATE
   while (gameAge < intendedAge) {
-    // Make random moves just to demonstrate.
-    const player = Math.floor(Math.random() * 2)
-    if (Math.random() < 0.1 && !game.games[player].active) {
-      game.play(player, Math.floor(Math.random() * WIDTH), 2, 0)
+    if (mirrorGame!.games.every((game) => game.busy)) {
+      mirrorGame!.tick()
     }
-    game.tick()
     gameAge++
   }
   const nextTickTime = gameAge * MS_PER_FRAME + gameStart
@@ -49,7 +124,7 @@ function tick() {
   tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
 }
 
-const gameState = ref(game.state)
+const gameState = ref<GameState[] | null>(null)
 
 const fallMu = ref(0)
 
@@ -71,23 +146,24 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * GAME_FRAME_RATE))
   }
 
-  if (lastFrameDrawn !== gameAge) {
+  if (lastFrameDrawn !== gameAge && mirrorGame !== null) {
     lastFrameDrawn = gameAge
 
-    gameState.value = game.state
+    gameState.value = mirrorGame.state
   }
 
   frameId = window.requestAnimationFrame(draw)
 }
 
+// Mount server connection, game loop and animation loop.
+
 onMounted(() => {
-  gameAge = 0
-  gameStart = null
-  tickId = window.setTimeout(tick, 1)
+  websocket.addMessageListener(onMessage)
   frameId = window.requestAnimationFrame(draw)
 })
 
 onUnmounted(() => {
+  websocket.removeMessageListener(onMessage)
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }
@@ -124,6 +200,9 @@ function getFill(colorIndex: number) {
 }
 
 const ghostAttrss = computed(() => {
+  if (gameState.value === null) {
+    return [[], []]
+  }
   const result = []
   let xOffset = LEFT_SCREEN_X
   for (const state of gameState.value) {
@@ -133,7 +212,7 @@ const ghostAttrss = computed(() => {
       const x = (index % WIDTH) + 0.5 + xOffset
       let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
       let stroke = getStroke(screen.grid[index])
-      if (screen.falling[index]) {
+      if (screen.falling[index] && GAME_TYPE === 'realtime') {
         y += fallMu.value
       }
       let href = ''
@@ -162,6 +241,9 @@ const ghostAttrss = computed(() => {
 })
 
 const panelAttrss = computed(() => {
+  if (gameState.value === null) {
+    return [[], []]
+  }
   const result = []
   let xOffset = LEFT_SCREEN_X
   for (const state of gameState.value) {
@@ -172,7 +254,7 @@ const panelAttrss = computed(() => {
       let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
       let fill = getFill(screen.grid[index])
       let stroke = getStroke(screen.grid[index])
-      if (screen.falling[index]) {
+      if (screen.falling[index] && GAME_TYPE === 'realtime') {
         y += fallMu.value
       }
       if (screen.ignited[index]) {
@@ -225,6 +307,9 @@ function panelSymbol(color: number, jiggle = false) {
 }
 
 const panelGlyphAttrss = computed(() => {
+  if (gameState.value === null) {
+    return [[], []]
+  }
   const result = []
   let xOffset = LEFT_SCREEN_X
   for (const state of gameState.value) {
@@ -234,7 +319,7 @@ const panelGlyphAttrss = computed(() => {
       const x = (index % WIDTH) + 0.5 + xOffset
       let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
       let fill = getStroke(screen.grid[index])
-      if (screen.falling[index]) {
+      if (screen.falling[index] && GAME_TYPE === 'realtime') {
         y += fallMu.value
       }
       let href = panelSymbol(screen.grid[index], screen.jiggling[index])
@@ -255,19 +340,29 @@ const panelGlyphAttrss = computed(() => {
   return result
 })
 
-const previewFills = computed(() =>
-  gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => FILLS[i]))
-)
+function previewAttrs(mapping: (i: number) => string, fillValue: string) {
+  let result: string[][] = [[], []]
+  if (gameState.value !== null) {
+    result = gameState.value.map((state) => state.visibleBag.slice(-4).map(mapping))
+  }
+  for (let i = 0; i < result.length; ++i) {
+    while (result[i].length < 4) {
+      result[i].push(fillValue)
+    }
+  }
+  return result
+}
 
-const previewStrokes = computed(() =>
-  gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => STROKES[i]))
-)
+const previewFills = computed(() => previewAttrs((i) => FILLS[i], 'black'))
 
-const previewSymbols = computed(() =>
-  gameState.value.map((state) => state.visibleBag.slice(-4).map((i) => panelSymbol(i)))
-)
+const previewStrokes = computed(() => previewAttrs((i) => STROKES[i], '#0a0a0a'))
+
+const previewSymbols = computed(() => previewAttrs((i) => panelSymbol(i), '#cross'))
 
 const garbageGlyphss = computed(() => {
+  if (gameState.value === null) {
+    return [[], []]
+  }
   const result: SVGAttributes[][] = []
   for (const state of gameState.value) {
     result.push(
@@ -287,6 +382,13 @@ const garbageGlyphss = computed(() => {
     )
   }
   return result
+})
+
+const scores = computed(() => {
+  if (gameState.value === null) {
+    return ['-', '-']
+  }
+  return gameState.value.map((state) => state.score)
 })
 </script>
 
@@ -376,7 +478,7 @@ const garbageGlyphss = computed(() => {
       <!--Score-->
       <text :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X" :y="2 + VISIBLE_HEIGHT">
         <tspan class="score-label">Score:</tspan>
-        <tspan class="score">{{ gameState[playerIndex].score }}</tspan>
+        <tspan class="score">{{ scores[playerIndex] }}</tspan>
       </text>
     </template>
   </svg>
