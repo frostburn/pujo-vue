@@ -480,6 +480,31 @@ function commitMove(x1: number, y1: number, orientation: number) {
   moveSent = true
   cursorLocked.value = false
 }
+
+const primaryDropletY = computed(() => {
+  if (gameState.value === null || cursor.value === null) {
+    return VISIBLE_HEIGHT - 1
+  }
+  const bottom =
+    mirrorGame!.games[0].screen.dropPuyo(cursor.value.x, cursorY.value + GHOST_Y + 1) - GHOST_Y - 1
+  if (cursor.value.x === cursor.value.snapX && cursor.value.snapY > cursorY.value) {
+    return bottom - 1
+  }
+  return bottom
+})
+const secondaryDropletY = computed(() => {
+  if (gameState.value === null || cursor.value === null) {
+    return VISIBLE_HEIGHT - 1
+  }
+  const bottom =
+    mirrorGame!.games[0].screen.dropPuyo(cursor.value.snapX, cursor.value.snapY + GHOST_Y + 1) -
+    GHOST_Y -
+    1
+  if (cursor.value.x === cursor.value.snapX && cursor.value.snapY < cursorY.value) {
+    return bottom - 1
+  }
+  return bottom
+})
 </script>
 
 <template>
@@ -590,6 +615,24 @@ function commitMove(x1: number, y1: number, orientation: number) {
         @unlock="cursorLocked = false"
         @commit="commitMove"
       />
+      <circle
+        r="0.1"
+        :cx="(cursor ? cursor.x : 2) + 0.5"
+        :cy="primaryDropletY + 0.5"
+        :fill="primaryStroke"
+        stroke="white"
+        stroke-width="0.03"
+        opacity="0.7"
+      ></circle>
+      <circle
+        r="0.1"
+        :cx="(cursor ? cursor.snapX : 2) + 0.5"
+        :cy="secondaryDropletY + 0.5"
+        :fill="secondaryStroke"
+        stroke="white"
+        stroke-width="0.03"
+        opacity="0.7"
+      ></circle>
     </g>
   </svg>
 </template>

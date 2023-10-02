@@ -33,9 +33,9 @@ const dy = ref(-1)
 
 // Silly linter, you know nothing
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const snapDx = computed(() => (Math.abs(dy.value) === 1 ? 0 : dx.value))
+const snapX = computed(() => (Math.abs(dy.value) === 1 ? x.value : x.value + dx.value))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const snapDy = computed(() => (Math.abs(dy.value) === 1 ? dy.value : 0))
+const snapY = computed(() => (Math.abs(dy.value) === 1 ? props.y + dy.value : props.y))
 
 const orientation = computed(() => {
   if (dy.value === -1) {
@@ -73,8 +73,8 @@ function setPrimaryCoords(coords: Coords) {
 }
 
 function orbitSecondPanel(coords: Coords) {
-  const deltaX = coords.x - x.value
-  const deltaY = coords.y - props.y
+  const deltaX = coords.x - x.value - 0.5
+  const deltaY = coords.y - props.y - 0.5
   const distance = Math.hypot(deltaX, deltaY)
   if (distance > MAX_ORBIT_DISTANCE) {
     unlockPrimary(coords)
@@ -173,7 +173,7 @@ const sStrokeWidth = computed(() => (props.active ? '0.1' : '0.03'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sSymbolFill = computed(() => (props.active ? props.secondaryStroke : 'none'))
 
-defineExpose({ x })
+defineExpose({ x, snapX, snapY })
 </script>
 <template xmlns="http://www.w3.org/2000/svg">
   <use
@@ -194,10 +194,5 @@ defineExpose({ x })
     :stroke="sStroke"
     :stroke-width="sStrokeWidth"
   ></use>
-  <use
-    :x="x + snapDx + 0.5"
-    :y="y + snapDy + 0.5"
-    :href="secondarySymbol"
-    :fill="sSymbolFill"
-  ></use>
+  <use :x="snapX + 0.5" :y="snapY + 0.5" :href="secondarySymbol" :fill="sSymbolFill"></use>
 </template>
