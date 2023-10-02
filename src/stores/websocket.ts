@@ -72,6 +72,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, kickDown }))
   }
 
+  function passMove() {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.send(JSON.stringify({ type: 'move', pass: true }))
+  }
+
   function addOpenListener(listener: OpenListener) {
     openListeners.add(listener)
   }
@@ -94,6 +102,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     requestGame,
     requestState,
     makeMove,
+    passMove,
     addOpenListener,
     removeOpenListener,
     addMessageListener,
