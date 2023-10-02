@@ -17,13 +17,14 @@ import {
 import { computed, onMounted, onUnmounted, ref, type SVGAttributes } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
+import PlayingCursor from './PlayingCursor.vue'
 
 type Move = {
   player: number
   x1: number
   y1: number
   orientation: number
-  kickDown: boolean
+  hardDrop: boolean
 }
 
 const GAME_TYPE: string = 'pausing'
@@ -36,6 +37,8 @@ const LOG = false
 
 let identity: number | null = null
 
+// Silly linter is silly
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let moveSent = false
 
 const bagQueues: number[][][] = [[], []]
@@ -62,8 +65,14 @@ function onMessage(message: any) {
     bagQueues[message.player].push(message.bag)
     // Bags are unloaded before each move so this is just for the visuals
     if (message.player === identity) {
+      if (LOG) {
+        console.log('Setting own bag')
+      }
       moveSent = false
-      mirrorGame!.games[message.player].bag = message.bag
+      mirrorGame!.games[0].bag = [...message.bag]
+    } else if (!mirrorGame!.games[1].bag.length) {
+      // Always show the first bag of the opponent
+      mirrorGame!.games[1].bag = [...message.bag]
     }
   }
   if (message.type === 'move') {
@@ -95,21 +104,24 @@ function tick() {
   }
 
   for (let i = 0; i < moveQueues.length; ++i) {
-    if (!mirrorGame!.games[i].busy && moveQueues[i].length) {
+    const j = identity ? 1 - i : i
+    if (!mirrorGame!.games[j].busy && moveQueues[i].length) {
       const move = moveQueues[i].shift()!
       const bag = bagQueues[i].shift()
       if (bag === undefined) {
         throw new Error('Bag queue desync')
       }
-      mirrorGame!.games[i].bag = bag
-      mirrorGame!.play(move.player, move.x1, move.y1, move.orientation, move.kickDown)
+      const player = identity ? 1 - move.player : move.player
+      if (player === 1) {
+        mirrorGame!.games[player].bag = bag
+        mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
+      } else {
+        const displayBag = mirrorGame!.games[player].bag
+        mirrorGame!.games[player].bag = bag
+        mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
+        mirrorGame!.games[player].bag = displayBag
+      }
     }
-  }
-
-  if (!mirrorGame!.games[identity!].busy && !moveSent) {
-    // Make random moves just to demonstrate.
-    websocket.makeMove(Math.floor(Math.random() * WIDTH), 2, 0)
-    moveSent = true
   }
 
   const intendedAge = (timeStamp - gameStart) * GAME_FRAME_RATE
@@ -128,8 +140,6 @@ const gameState = ref<GameState[] | null>(null)
 
 const fallMu = ref(0)
 
-let lastFrameDrawn: number | null = null
-
 let frameId: number | null = null
 
 let start: DOMHighResTimeStamp | null = null
@@ -146,9 +156,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * GAME_FRAME_RATE))
   }
 
-  if (lastFrameDrawn !== gameAge && mirrorGame !== null) {
-    lastFrameDrawn = gameAge
-
+  if (mirrorGame !== null) {
     gameState.value = mirrorGame.state
   }
 
@@ -180,6 +188,9 @@ const SCREEN_Y = 1
 const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
 const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
 const STROKE_WIDTH = 0.15
+const MISSING_FILL = 'black'
+const MISSING_STROKE = '#0a0a0a'
+const MISSING_SYMBOL = '#cross'
 
 function getStroke(colorIndex: number) {
   if (colorIndex < 0) {
@@ -262,7 +273,9 @@ const panelAttrss = computed(() => {
       }
       let href = ''
       if (screen.grid[index] === GARBAGE) {
-        if (screen.jiggling[index]) {
+        if (screen.sparking[index]) {
+          href = ''
+        } else if (screen.jiggling[index]) {
           href = '#jiggling-garbage'
         } else {
           href = '#garbage'
@@ -343,7 +356,7 @@ const panelGlyphAttrss = computed(() => {
 function previewAttrs(mapping: (i: number) => string, fillValue: string) {
   let result: string[][] = [[], []]
   if (gameState.value !== null) {
-    result = gameState.value.map((state) => state.visibleBag.slice(-4).map(mapping))
+    result = gameState.value.map((state) => state.preview.map(mapping))
   }
   for (let i = 0; i < result.length; ++i) {
     while (result[i].length < 4) {
@@ -353,11 +366,26 @@ function previewAttrs(mapping: (i: number) => string, fillValue: string) {
   return result
 }
 
-const previewFills = computed(() => previewAttrs((i) => FILLS[i], 'black'))
+const previewFills = computed(() => previewAttrs((i) => FILLS[i], MISSING_FILL))
 
-const previewStrokes = computed(() => previewAttrs((i) => STROKES[i], '#0a0a0a'))
+const previewStrokes = computed(() => previewAttrs((i) => STROKES[i], MISSING_STROKE))
 
-const previewSymbols = computed(() => previewAttrs((i) => panelSymbol(i), '#cross'))
+const previewSymbols = computed(() => previewAttrs((i) => panelSymbol(i), MISSING_SYMBOL))
+
+function garbageGlyph(symbol: string, late = false) {
+  if (symbol === 'rock') {
+    symbol = 'spade'
+  } else if (symbol === 'crown') {
+    symbol = 'diamond'
+  }
+  return {
+    href: `#${symbol}`,
+    fill: FILLS[GARBAGE],
+    stroke: STROKES[GARBAGE],
+    'stroke-width': STROKE_WIDTH,
+    opacity: late ? '0.5' : '1.0'
+  }
+}
 
 const garbageGlyphss = computed(() => {
   if (gameState.value === null) {
@@ -365,21 +393,8 @@ const garbageGlyphss = computed(() => {
   }
   const result: SVGAttributes[][] = []
   for (const state of gameState.value) {
-    result.push(
-      combinedGarbageDisplay(state.pendingGarbage, state.lateGarbage).map((symbol) => {
-        if (symbol === 'rock') {
-          symbol = 'spade'
-        } else if (symbol === 'crown') {
-          symbol = 'diamond'
-        }
-        return {
-          href: `#${symbol}`,
-          fill: FILLS[GARBAGE],
-          stroke: STROKES[GARBAGE],
-          'stroke-width': STROKE_WIDTH
-        }
-      })
-    )
+    const { pending, late } = combinedGarbageDisplay(state.pendingGarbage, state.lateGarbage)
+    result.push(pending.map((s) => garbageGlyph(s)).concat(late.map((s) => garbageGlyph(s, true))))
   }
   return result
 })
@@ -390,10 +405,85 @@ const scores = computed(() => {
   }
   return gameState.value.map((state) => state.score)
 })
+
+const svg = ref<SVGSVGElement | null>(null)
+const cursorContainer = ref<SVGGraphicsElement | null>(null)
+const cursor = ref<typeof PlayingCursor | null>(null)
+
+const cursorTransform = `translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`
+
+const cursorLocked = ref(false)
+const cursorY = ref(1)
+
+const primaryFill = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_FILL
+    : FILLS[gameState.value[0].hand[0]]
+)
+const primaryStroke = computed(() => {
+  if (cursor.value === null || gameState.value === null || !gameState.value[0].hand.length) {
+    return MISSING_STROKE
+  }
+  const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
+  if (gameState.value[0].screen.grid[index] === gameState.value[0].hand[0]) {
+    return 'white'
+  }
+  return gameState.value === null ? MISSING_STROKE : STROKES[gameState.value[0].hand[0]]
+})
+const primarySymbol = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_SYMBOL
+    : panelSymbol(gameState.value[0].hand[0])
+)
+
+const secondaryFill = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_FILL
+    : FILLS[gameState.value[0].hand[1]]
+)
+const secondaryStroke = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_STROKE
+    : STROKES[gameState.value[0].hand[1]]
+)
+const secondarySymbol = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_SYMBOL
+    : panelSymbol(gameState.value[0].hand[1])
+)
+
+const cursorActive = computed(() => {
+  if (gameState.value === null) {
+    return false
+  }
+  return !gameState.value[0].busy
+})
+
+function kickCursor() {
+  if (gameState.value === null || cursor.value === null) {
+    return
+  }
+  let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
+  while (gameState.value[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
+    index -= WIDTH
+    cursorY.value -= 1
+  }
+}
+
+function lockCursor() {
+  cursorLocked.value = true
+  kickCursor()
+}
+
+function commitMove(x1: number, y1: number, orientation: number) {
+  websocket.makeMove(x1, y1, orientation)
+  moveSent = true
+  cursorLocked.value = false
+}
 </script>
 
 <template>
-  <svg width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
+  <svg ref="svg" width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
     <SVGDefs />
     <!--Ghost panels go behind the screens-->
     <template v-for="(ghostAttrs, playerIndex) in ghostAttrss" :key="playerIndex">
@@ -481,10 +571,33 @@ const scores = computed(() => {
         <tspan class="score">{{ scores[playerIndex] }}</tspan>
       </text>
     </template>
+    <g ref="cursorContainer" :transform="cursorTransform" :stroke-width="STROKE_WIDTH">
+      <PlayingCursor
+        ref="cursor"
+        :svg="svg"
+        :container="cursorContainer"
+        :primaryFill="primaryFill"
+        :primaryStroke="primaryStroke"
+        :primarySymbol="primarySymbol"
+        :secondaryFill="secondaryFill"
+        :secondaryStroke="secondaryStroke"
+        :secondarySymbol="secondarySymbol"
+        :locked="cursorLocked"
+        :y="cursorY"
+        :active="cursorActive"
+        @setY="(y) => (cursorY = y)"
+        @lock="lockCursor"
+        @unlock="cursorLocked = false"
+        @commit="commitMove"
+      />
+    </g>
   </svg>
 </template>
 
 <style scoped>
+svg {
+  user-select: none;
+}
 .score-label {
   font:
     bold 0.7px 'Arial',
