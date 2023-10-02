@@ -505,6 +505,22 @@ const secondaryDropletY = computed(() => {
   }
   return bottom
 })
+
+const preIgnitions = computed(() => {
+  if (gameState.value === null || cursor.value == null) {
+    return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
+  }
+  return mirrorGame!.games[0].screen
+    .preIgnite(
+      cursor.value.x,
+      primaryDropletY.value + GHOST_Y + 1,
+      gameState.value[0].hand[0],
+      cursor.value.snapX,
+      secondaryDropletY.value + GHOST_Y + 1,
+      gameState.value[0].hand[1]
+    )
+    .slice(WIDTH * (GHOST_Y + 1))
+})
 </script>
 
 <template>
@@ -518,7 +534,15 @@ const secondaryDropletY = computed(() => {
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
     <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
       <!--Playing grid-->
-      <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i"></use>
+      <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i">
+        <animate
+          v-if="playerIndex === 0 && preIgnitions[i]"
+          attributeName="fill"
+          values="#ffe;#bbb;#ffe"
+          dur="1s"
+          repeatCount="indefinite"
+        ></animate>
+      </use>
       <use v-for="(attrs, i) in panelGlyphAttrss[playerIndex]" v-bind="attrs" :key="i"></use>
       <!--Piece preview-->
       <g :stroke-width="STROKE_WIDTH">

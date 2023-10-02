@@ -254,6 +254,19 @@ const smallDiamondD = transformPath(diamondD, -0.6)
         id="cross"
         points="0,0.1 0.1,0.2 0.2,0.1 0.1,0 0.2,-0.1 0.1,-0.2 0,-0.1 -0.1,-0.2 -0.2,-0.1 -0.1,0, -0.2,0.1 -0.1,0.2"
       ></polygon>
+
+      <!--Pre-ignition-->
+      <filter id="pre-ignite">
+        <rect id="flashing" fill="gray">
+          <animate
+            attributeName="fill"
+            values="white;black;white"
+            dur="1s"
+            repeatCount="indefinite"
+          ></animate>
+        </rect>
+        <feBlend in="SourceGraphic" in2="flashing" mode="overlay"></feBlend>
+      </filter>
     </defs>
   </svg>
 </template>
