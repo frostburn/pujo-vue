@@ -41,7 +41,7 @@ const GAME_TYPE: string = 'pausing'
 
 const websocket = useWebSocketStore()
 
-const LOG = false
+const LOG = true
 
 let identity: number | null = null
 
@@ -97,7 +97,8 @@ const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 
 // This is merely a mirror driven by the server.
 let mirrorGame: MultiplayerGame | null = null
-let passing = ref(false)
+const passing = ref(false)
+const justPassed = ref(false)
 
 let tickId: number | null = null
 
@@ -185,10 +186,11 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 // User interaction goes here.
 function passOnEscape(event: KeyboardEvent) {
-  if (gameState.value === null) {
+  if (gameState.value === null || justPassed.value) {
     return
   }
   if (event.code === 'Escape' && !gameState.value[0].busy && gameState.value[1].busy) {
+    justPassed.value = true
     websocket.passMove()
   }
 }
@@ -509,6 +511,7 @@ function lockCursor() {
 
 function commitMove(x1: number, y1: number, orientation: number) {
   websocket.makeMove(x1, y1, orientation)
+  justPassed.value = false
   moveSent = true
   cursorLocked.value = false
 }
