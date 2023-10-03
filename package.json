@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
+    "build-worklet": "tsc src/worklet.d.ts src/audio-processor.ts --outDir dist --target es2015 --module es2015 --moduleResolution bundler",
     "preview": "vite preview",
     "test:unit": "vitest",
     "build-only": "vite build",
