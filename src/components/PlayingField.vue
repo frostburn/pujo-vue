@@ -18,6 +18,7 @@ import { computed, onMounted, onUnmounted, ref, type SVGAttributes } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
+import { chainFX } from '@/soundFX'
 
 type NormalMove = {
   player: number
@@ -41,7 +42,7 @@ const GAME_TYPE: string = 'pausing'
 
 const websocket = useWebSocketStore()
 
-const LOG = true
+const LOG = false
 
 let identity: number | null = null
 
@@ -148,6 +149,11 @@ function tick() {
       const tickResults = mirrorGame!.tick()
       if (tickResults.every((r) => !r.busy)) {
         passing.value = false
+      }
+      for (let i = 0; i < tickResults.length; ++i) {
+        if (tickResults[i].didClear) {
+          chainFX(i, tickResults[i].chainNumber)
+        }
       }
     }
     gameAge++
