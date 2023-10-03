@@ -19,13 +19,21 @@ import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
 
-type Move = {
+type NormalMove = {
   player: number
   x1: number
   y1: number
   orientation: number
   hardDrop: boolean
+  pass: false
 }
+
+type PassingMove = {
+  player: number
+  pass: true
+}
+
+type Move = NormalMove | PassingMove
 
 const GAME_TYPE: string = 'pausing'
 
@@ -89,6 +97,7 @@ const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 
 // This is merely a mirror driven by the server.
 let mirrorGame: MultiplayerGame | null = null
+let passing = ref(false)
 
 let tickId: number | null = null
 
@@ -111,23 +120,34 @@ function tick() {
       if (bag === undefined) {
         throw new Error('Bag queue desync')
       }
-      const player = identity ? 1 - move.player : move.player
-      if (player === 1) {
-        mirrorGame!.games[player].bag = bag
-        mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
+      if (move.pass) {
+        passing.value = true
       } else {
-        const displayBag = mirrorGame!.games[player].bag
-        mirrorGame!.games[player].bag = bag
-        mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
-        mirrorGame!.games[player].bag = displayBag
+        passing.value = false
+        const player = identity ? 1 - move.player : move.player
+        if (player === 1) {
+          mirrorGame!.games[player].bag = bag
+          mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
+        } else {
+          const displayBag = mirrorGame!.games[player].bag
+          mirrorGame!.games[player].bag = bag
+          mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
+          mirrorGame!.games[player].bag = displayBag
+        }
       }
     }
   }
 
   const intendedAge = (timeStamp - gameStart) * GAME_FRAME_RATE
   while (gameAge < intendedAge) {
-    if (mirrorGame!.games.every((game) => game.busy)) {
-      mirrorGame!.tick()
+    if (
+      mirrorGame!.games.every((game) => game.busy) ||
+      (passing.value && mirrorGame!.games.some((game) => game.busy))
+    ) {
+      const tickResults = mirrorGame!.tick()
+      if (tickResults.every((r) => !r.busy)) {
+        passing.value = false
+      }
     }
     gameAge++
   }
@@ -163,11 +183,22 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   frameId = window.requestAnimationFrame(draw)
 }
 
+// User interaction goes here.
+function passOnEscape(event: KeyboardEvent) {
+  if (gameState.value === null) {
+    return
+  }
+  if (event.code === 'Escape' && !gameState.value[0].busy && gameState.value[1].busy) {
+    websocket.passMove()
+  }
+}
+
 // Mount server connection, game loop and animation loop.
 
 onMounted(() => {
   websocket.addMessageListener(onMessage)
   frameId = window.requestAnimationFrame(draw)
+  document.addEventListener('keydown', passOnEscape)
 })
 
 onUnmounted(() => {
@@ -178,6 +209,7 @@ onUnmounted(() => {
   if (frameId !== null) {
     window.cancelAnimationFrame(frameId)
   }
+  document.removeEventListener('keydown', passOnEscape)
 })
 
 // Graphics
@@ -456,7 +488,7 @@ const cursorActive = computed(() => {
   if (gameState.value === null) {
     return false
   }
-  return !gameState.value[0].busy
+  return !gameState.value[0].busy && !passing.value
 })
 
 function kickCursor() {
