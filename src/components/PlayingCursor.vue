@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 // Please note that orbit distances less than 0.5 would need updates to the second panel during cursor movement.
 const MIN_ORBIT_DISTANCE = 0.5
-const MAX_ORBIT_DISTANCE = 6.5
+const MAX_ORBIT_DISTANCE = 7
 
 type Coords = {
   x: number
@@ -30,6 +30,7 @@ const emit = defineEmits(['setY', 'lock', 'unlock', 'commit'])
 const x = ref(1)
 const dx = ref(0)
 const dy = ref(-1)
+const wantsToRotate = ref(false)
 
 // Silly linter, you know nothing
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -37,20 +38,41 @@ const snapX = computed(() => (Math.abs(dy.value) === 1 ? x.value : x.value + dx.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const snapY = computed(() => (Math.abs(dy.value) === 1 ? props.y + dy.value : props.y))
 
-const orientation = computed(() => {
-  if (dy.value === -1) {
+const orientation = computed({
+  get() {
+    if (dy.value === -1) {
+      return 0
+    }
+    if (dy.value === 1) {
+      return 2
+    }
+    if (dx.value === -1) {
+      return 1
+    }
+    if (dx.value === 1) {
+      return 3
+    }
     return 0
+  },
+  set(newValue) {
+    newValue &= 3
+    if (newValue === 0) {
+      dx.value = 0
+      dy.value = -1
+    }
+    if (newValue === 1) {
+      dx.value = -1
+      dy.value = 0
+    }
+    if (newValue === 2) {
+      dx.value = 0
+      dy.value = 1
+    }
+    if (newValue === 3) {
+      dx.value = 1
+      dy.value = 0
+    }
   }
-  if (dy.value === 1) {
-    return 2
-  }
-  if (dx.value === -1) {
-    return 1
-  }
-  if (dx.value === 1) {
-    return 3
-  }
-  return 0
 })
 
 let pt: DOMPoint | null = null
@@ -111,15 +133,10 @@ function onMouseMove(event: MouseEvent) {
   }
 }
 
-function lockPrimary(event: MouseEvent) {
-  if (props.locked || event.button !== 0 || !props.active) {
+function lockPrimary() {
+  if (props.locked || !props.active) {
     return
   }
-  const coords = containerCoords(event)
-  if (coords === undefined) {
-    return
-  }
-  setPrimaryCoords(coords)
   emit('lock')
 }
 
@@ -130,32 +147,154 @@ function unlockPrimary(coords: Coords) {
   setPrimaryCoords(coords)
 }
 
-function commitMove(event: MouseEvent) {
-  if (!props.locked || event.button !== 0 || !props.active) {
+function commitMove() {
+  if (!props.locked || !props.active) {
+    return
+  }
+  emit('commit', x.value, props.y + GHOST_Y + 1, orientation.value)
+  dx.value = 0
+  dy.value = -1
+  wantsToRotate.value = false
+}
+
+function kickCursor() {
+  if (x.value < 0 || snapX.value < 0) {
+    if (props.locked) {
+      return true
+    }
+    x.value++
+  }
+  if (x.value >= WIDTH || snapX.value >= WIDTH) {
+    if (props.locked) {
+      return true
+    }
+    x.value--
+  }
+  if (props.y >= VISIBLE_HEIGHT || snapY.value >= VISIBLE_HEIGHT) {
+    if (props.locked) {
+      return true
+    }
+    emit('setY', props.y - 1)
+  }
+  return false
+}
+
+function onMouseDown(event: MouseEvent) {
+  if (event.button !== 0 || props.locked || !props.active) {
     return
   }
   const coords = containerCoords(event)
   if (coords === undefined) {
     return
   }
-  emit('commit', x.value, props.y + GHOST_Y + 1, orientation.value)
-  dx.value = 0
-  dy.value = -1
+  setPrimaryCoords(coords)
+  lockPrimary()
+}
+
+function onMouseUp(event: MouseEvent) {
+  if (event.button !== 0 || !props.locked || !props.active) {
+    return
+  }
+  const coords = containerCoords(event)
+  if (coords === undefined) {
+    return
+  }
+  orbitSecondPanel(coords)
+  commitMove()
+}
+
+const ARROW_KEYS = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']
+const WASD_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD']
+
+function onKeyDown(event: KeyboardEvent) {
+  const code = event.code
+  if (code === 'Space' && !event.repeat && !props.locked && props.active) {
+    lockPrimary()
+  }
+  // Moving and even rotating an inactive cursor is not so bad when done using the keyboard.
+  if (props.locked) {
+    if (ARROW_KEYS.includes(code) || WASD_KEYS.includes(code)) {
+      emit('unlock')
+    }
+  } else {
+    if ((code === 'ArrowUp' || code === 'KeyW') && props.y >= 0 && snapY.value >= 0) {
+      emit('setY', props.y - 1)
+    }
+    if (
+      (code === 'ArrowDown' || code === 'KeyS') &&
+      props.y < VISIBLE_HEIGHT - 1 &&
+      snapY.value < VISIBLE_HEIGHT - 1
+    ) {
+      emit('setY', props.y + 1)
+    }
+    if ((code === 'ArrowLeft' || code === 'KeyA') && x.value > 0 && snapX.value > 0) {
+      x.value--
+    }
+    if (
+      (code === 'ArrowRight' || code === 'KeyD') &&
+      x.value < WIDTH - 1 &&
+      snapX.value < WIDTH - 1
+    ) {
+      x.value++
+    }
+  }
+  if (code === 'KeyJ') {
+    orientation.value++
+    if (kickCursor()) {
+      if (wantsToRotate.value) {
+        wantsToRotate.value = false
+        orientation.value++
+        if (kickCursor()) {
+          orientation.value++
+        }
+      } else {
+        wantsToRotate.value = true
+        orientation.value--
+      }
+    }
+  }
+  if (code === 'KeyK') {
+    orientation.value--
+    if (kickCursor()) {
+      if (wantsToRotate.value) {
+        wantsToRotate.value = false
+        orientation.value--
+        if (kickCursor()) {
+          orientation.value--
+        }
+      } else {
+        wantsToRotate.value = true
+        orientation.value++
+      }
+    }
+  }
+}
+
+function onKeyUp(event: KeyboardEvent) {
+  if (event.code === 'Space') {
+    commitMove()
+  }
 }
 
 onMounted(() => {
   document.addEventListener('mousemove', onMouseMove)
 
   // TODO: Limit to SVG element
-  document.addEventListener('mousedown', lockPrimary)
-  document.addEventListener('mouseup', commitMove)
+  document.addEventListener('mousedown', onMouseDown)
+  document.addEventListener('mouseup', onMouseUp)
+
+  document.addEventListener('keydown', onKeyDown)
+  document.addEventListener('keyup', onKeyUp)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onMouseMove)
 
-  document.removeEventListener('mousedown', lockPrimary)
-  document.removeEventListener('mouseup', commitMove)
+  document.removeEventListener('mousedown', onMouseDown)
+  document.removeEventListener('mouseup', onMouseUp)
+
+  document.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('keyup', onKeyUp)
 })
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
