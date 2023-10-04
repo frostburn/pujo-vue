@@ -57,9 +57,11 @@ const RIGHT_PARAMS = {
   phaseModulation: 0.8
 }
 
-let context: ReturnType<typeof useAudioContextStore> | null = null
-
-export function chainFX(player: number, chainNumber: number) {
+export function chainFX(
+  context: ReturnType<typeof useAudioContextStore>,
+  player: number,
+  chainNumber: number
+) {
   if (!chainNumber) {
     return
   }
