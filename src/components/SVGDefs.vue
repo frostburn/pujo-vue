@@ -267,6 +267,62 @@ const smallDiamondD = transformPath(diamondD, -0.6)
         </rect>
         <feBlend in="SourceGraphic" in2="flashing" mode="overlay"></feBlend>
       </filter>
+
+      <!--All Clear indicator-->
+      <path id="all-clear-path" d="M 1.2 2 q 2.05 -0.5 4.2 0"></path>
+      <text id="all-clear" class="all-clear">
+        <textPath href="#all-clear-path">All Clear</textPath>
+      </text>
+
+      <!--Game Over indicator-->
+      <g id="game-over">
+        <ellipse
+          cx="3"
+          cy="4.2"
+          rx="2.6"
+          ry="1.7"
+          fill="rgba(0, 0, 0, 0.6)"
+          stroke="rgba(0, 0, 0, 0.7)"
+          stroke-width="0.1"
+        ></ellipse>
+        <path id="game-path" d="M 1.2 4 q 1.9 0.4 3.8 0" fill="none"></path>
+        <path
+          id="over-path"
+          d="M 1.4 5.2 q 1.65 0.2 3.3 0"
+          fill="none"
+          stroke="red"
+          stroke-width="0.2"
+        ></path>
+        <text class="game-over">
+          <textPath href="#game-path" textLenght="20%">Game</textPath>
+        </text>
+        <text class="game-over">
+          <textPath href="#over-path" textLength="17%">Over</textPath>
+        </text>
+      </g>
     </defs>
   </svg>
 </template>
+
+<style>
+.all-clear {
+  font:
+    bold 1px 'Arial',
+    sans-serif;
+  fill: aliceblue;
+  stroke: cornflowerblue;
+  stroke-width: 0.035px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.game-over {
+  font:
+    bold 1.3px 'Arial',
+    sans-serif;
+  fill: red;
+  stroke: yellow;
+  stroke-width: 0.035px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+</style>

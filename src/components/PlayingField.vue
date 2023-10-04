@@ -69,7 +69,9 @@ function onMessage(message: any) {
     moveQueues.forEach((queue) => (queue.length = 0))
     gameAge = 0
     gameStart = null
-    tickId = window.setTimeout(tick, 1)
+    if (tickId === null) {
+      tickId = window.setTimeout(tick, 1)
+    }
   }
   if (message.type === 'bag') {
     bagQueues[message.player].push(message.bag)
@@ -89,7 +91,8 @@ function onMessage(message: any) {
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
-    websocket.requestGame()
+    // TODO: Requeue manually #24
+    setTimeout(() => websocket.requestGame(), 4000)
   }
 }
 
@@ -594,6 +597,18 @@ const preIgnitions = computed(() => {
     </template>
     <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
+    <use
+      v-if="gameState && gameState[0].allClearBonus"
+      href="#all-clear"
+      :x="LEFT_SCREEN_X"
+      :y="SCREEN_Y"
+    ></use>
+    <use
+      v-if="gameState && gameState[1].allClearBonus"
+      href="#all-clear"
+      :x="RIGHT_SCREEN_X"
+      :y="SCREEN_Y"
+    ></use>
     <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
       <!--Playing grid-->
       <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i">
@@ -668,6 +683,18 @@ const preIgnitions = computed(() => {
           stroke="none"
         ></use>
       </g>
+      <use
+        v-if="gameState && gameState[0].lockedOut"
+        href="#game-over"
+        :x="LEFT_SCREEN_X"
+        :y="SCREEN_Y"
+      ></use>
+      <use
+        v-if="gameState && gameState[1].lockedOut"
+        href="#game-over"
+        :x="RIGHT_SCREEN_X"
+        :y="SCREEN_Y"
+      ></use>
       <!--Garbage queue-->
       <use
         v-for="(attrs, i) in garbageGlyphss[playerIndex]"
