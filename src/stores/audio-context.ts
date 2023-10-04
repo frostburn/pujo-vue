@@ -5,14 +5,20 @@ import { defineStore } from 'pinia'
 
 const SILENCE = 1e-6
 
+const audioLag = navigator.userAgent.includes('Chrome') ? 0.001 : 0.03
+
 export const useAudioContextStore = defineStore('audio-context', () => {
   const context = ref<AudioContext | null>(null)
   const gain = ref<GainNode | null>(null)
   const arpeggiator0 = ref<AudioWorkletNode | null>(null)
   const arpeggiator1 = ref<AudioWorkletNode | null>(null)
   const noiseFilter = ref<BiquadFilterNode | null>(null)
-  const noiseGate = ref<GainNode | null>(null)
+  const noiseGain = ref<GainNode | null>(null)
   const noise = ref<AudioWorkletNode | null>(null)
+  const plopEnvelope = ref<ConstantSourceNode | null>(null)
+  const plopDetuner = ref<GainNode | null>(null)
+  const plopOscillator = ref<OscillatorNode | null>(null)
+  const plopGain = ref<GainNode | null>(null)
 
   // Should be called in response to user interaction.
   async function initialize() {
@@ -39,13 +45,27 @@ export const useAudioContextStore = defineStore('audio-context', () => {
     noiseFilter.value.type = 'lowpass'
     noiseFilter.value.frequency.setValueAtTime(4000, now)
     noiseFilter.value.Q.setValueAtTime(2.9, now)
-    noiseGate.value = context.value.createGain()
-    noiseGate.value.gain.setValueAtTime(SILENCE, now)
+    noiseGain.value = context.value.createGain()
+    noiseGain.value.gain.setValueAtTime(SILENCE, now)
     noise.value = new AudioWorkletNode(context.value, 'noise-processor')
     noise.value
-      .connect(noiseGate.value)
+      .connect(noiseGain.value)
       .connect(noiseFilter.value)
       .connect(context.value.destination)
+
+    plopEnvelope.value = context.value.createConstantSource()
+    plopEnvelope.value.offset.setValueAtTime(SILENCE, now)
+    plopDetuner.value = context.value.createGain()
+    plopDetuner.value.gain.setValueAtTime(1200, now)
+    plopOscillator.value = context.value.createOscillator()
+    plopOscillator.value.frequency.setValueAtTime(300, now)
+    plopGain.value = context.value.createGain()
+    plopGain.value.gain.setValueAtTime(0, now)
+    plopEnvelope.value.connect(plopDetuner.value).connect(plopOscillator.value.detune)
+    plopEnvelope.value.connect(plopGain.value.gain)
+    plopOscillator.value.connect(plopGain.value).connect(context.value.destination)
+    plopEnvelope.value.start(now)
+    plopOscillator.value.start(now)
   }
 
   async function unintialize() {
@@ -64,11 +84,25 @@ export const useAudioContextStore = defineStore('audio-context', () => {
     if (noiseFilter.value) {
       noiseFilter.value.disconnect()
     }
-    if (noiseGate.value) {
-      noiseGate.value.disconnect()
+    if (noiseGain.value) {
+      noiseGain.value.disconnect()
     }
     if (noise.value) {
       noise.value.disconnect()
+    }
+    if (plopEnvelope.value) {
+      plopEnvelope.value.stop()
+      plopEnvelope.value.disconnect()
+    }
+    if (plopDetuner.value) {
+      plopDetuner.value.disconnect()
+    }
+    if (plopOscillator.value) {
+      plopOscillator.value.stop()
+      plopOscillator.value.disconnect()
+    }
+    if (plopGain.value) {
+      plopGain.value.disconnect()
     }
     await context.value.close()
     context.value = null
@@ -86,19 +120,35 @@ export const useAudioContextStore = defineStore('audio-context', () => {
   }
 
   function impact(frequencyOffset = 0) {
-    if (!context.value || !noise.value || !noiseGate.value || !noiseFilter.value) {
+    if (!context.value || !noise.value || !noiseGain.value || !noiseFilter.value) {
       return
     }
-    const now = context.value.currentTime
+    const now = context.value.currentTime + audioLag
     const nat = noise.value.parameters.get('nat')!
     nat.cancelScheduledValues(now)
     nat.setValueAtTime(Math.log(9000 + Math.random() * 300 + frequencyOffset), now)
     nat.linearRampToValueAtTime(Math.log(6000 + Math.random() * 200 + frequencyOffset), now + 0.11)
-    noiseGate.value.gain.cancelScheduledValues(now)
-    noiseGate.value.gain.setValueAtTime(0.15, now)
-    noiseGate.value.gain.exponentialRampToValueAtTime(SILENCE, now + 0.31)
+    noiseGain.value.gain.cancelScheduledValues(now)
+    noiseGain.value.gain.setValueAtTime(0.15, now)
+    noiseGain.value.gain.exponentialRampToValueAtTime(SILENCE, now + 0.31)
     noiseFilter.value.frequency.setTargetAtTime(
       3800 + Math.random() * 400 + frequencyOffset * 0.2,
+      now,
+      0.01
+    )
+  }
+
+  function plop(frequencyOffset = 0) {
+    if (!context.value || !plopEnvelope.value || !plopOscillator.value) {
+      return
+    }
+    const now = context.value.currentTime + audioLag
+    plopEnvelope.value.offset.cancelScheduledValues(now)
+    plopOscillator.value.frequency.cancelScheduledValues(now)
+    plopEnvelope.value.offset.setTargetAtTime(0.33 + Math.random() * 0.05, now, 0.004)
+    plopEnvelope.value.offset.setTargetAtTime(SILENCE, now + 0.015, 0.015)
+    plopOscillator.value.frequency.setTargetAtTime(
+      280 + Math.random() * 40 + frequencyOffset,
       now,
       0.01
     )
@@ -108,6 +158,7 @@ export const useAudioContextStore = defineStore('audio-context', () => {
     initialize,
     unintialize,
     arpeggiate,
-    impact
+    impact,
+    plop
   }
 })

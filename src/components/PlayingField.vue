@@ -154,16 +154,27 @@ function tick() {
         passing.value = false
       }
       let impactOffset = 0
+      let plopOffset = 0
       for (let i = 0; i < tickResults.length; ++i) {
         if (tickResults[i].didClear) {
           chainFX(audioContext, i, tickResults[i].chainNumber)
         }
-        if (tickResults[i].didLand || tickResults[i].didJiggle) {
+        // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
+        if (
+          tickResults[i].coloredLanded ||
+          (tickResults[i].didJiggle && !tickResults[i].garbageLanded)
+        ) {
           impactOffset += 1 + 2000 * i
+        }
+        if (tickResults[i].garbageLanded) {
+          plopOffset += 1 + 20 * i
         }
       }
       if (impactOffset) {
         audioContext.impact(impactOffset)
+      }
+      if (plopOffset) {
+        audioContext.plop(plopOffset)
       }
     }
     gameAge++
