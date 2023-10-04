@@ -19,6 +19,7 @@ import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
 import { chainFX } from '@/soundFX'
+import { useAudioContextStore } from '@/stores/audio-context'
 
 type NormalMove = {
   player: number
@@ -92,6 +93,8 @@ function onMessage(message: any) {
   }
 }
 
+const audioContext = useAudioContextStore()
+
 // Frames per millisecond
 const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
 const MS_PER_FRAME = 1 / GAME_FRAME_RATE
@@ -152,8 +155,11 @@ function tick() {
       }
       for (let i = 0; i < tickResults.length; ++i) {
         if (tickResults[i].didClear) {
-          chainFX(i, tickResults[i].chainNumber)
+          chainFX(audioContext, i, tickResults[i].chainNumber)
         }
+      }
+      if (tickResults.some((r) => r.didJiggle || r.didLand)) {
+        audioContext.impact()
       }
     }
     gameAge++
