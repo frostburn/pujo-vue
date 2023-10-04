@@ -484,6 +484,11 @@ const primaryFill = computed(() =>
     ? MISSING_FILL
     : FILLS[gameState.value[0].hand[0]]
 )
+const primaryDropletFill = computed(() =>
+  gameState.value === null || !gameState.value[0].hand.length
+    ? MISSING_STROKE
+    : STROKES[gameState.value[0].hand[0]]
+)
 const primaryStroke = computed(() => {
   if (cursor.value === null || gameState.value === null || !gameState.value[0].hand.length) {
     return MISSING_STROKE
@@ -492,7 +497,7 @@ const primaryStroke = computed(() => {
   if (gameState.value[0].screen.grid[index] === gameState.value[0].hand[0]) {
     return 'white'
   }
-  return gameState.value === null ? MISSING_STROKE : STROKES[gameState.value[0].hand[0]]
+  return STROKES[gameState.value[0].hand[0]]
 })
 const primarySymbol = computed(() =>
   gameState.value === null || !gameState.value[0].hand.length
@@ -732,7 +737,7 @@ const preIgnitions = computed(() => {
         r="0.1"
         :cx="(cursor ? cursor.x : 2) + 0.5"
         :cy="primaryDropletY + 0.5"
-        :fill="primaryStroke"
+        :fill="primaryDropletFill"
         stroke="white"
         stroke-width="0.03"
         opacity="0.7"
