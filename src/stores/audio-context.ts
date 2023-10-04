@@ -85,19 +85,23 @@ export const useAudioContextStore = defineStore('audio-context', () => {
     }
   }
 
-  function impact() {
+  function impact(frequencyOffset = 0) {
     if (!context.value || !noise.value || !noiseGate.value || !noiseFilter.value) {
       return
     }
     const now = context.value.currentTime
     const nat = noise.value.parameters.get('nat')!
     nat.cancelScheduledValues(now)
-    nat.setValueAtTime(Math.log(9000 + Math.random() * 300), now)
-    nat.linearRampToValueAtTime(Math.log(6000 + Math.random() * 200), now + 0.11)
+    nat.setValueAtTime(Math.log(9000 + Math.random() * 300 + frequencyOffset), now)
+    nat.linearRampToValueAtTime(Math.log(6000 + Math.random() * 200 + frequencyOffset), now + 0.11)
     noiseGate.value.gain.cancelScheduledValues(now)
     noiseGate.value.gain.setValueAtTime(0.15, now)
     noiseGate.value.gain.exponentialRampToValueAtTime(SILENCE, now + 0.31)
-    noiseFilter.value.frequency.setTargetAtTime(3800 + Math.random() * 400, now, 0.01)
+    noiseFilter.value.frequency.setTargetAtTime(
+      3800 + Math.random() * 400 + frequencyOffset * 0.2,
+      now,
+      0.01
+    )
   }
 
   return {

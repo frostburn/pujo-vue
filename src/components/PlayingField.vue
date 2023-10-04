@@ -153,13 +153,17 @@ function tick() {
       if (tickResults.every((r) => !r.busy)) {
         passing.value = false
       }
+      let impactOffset = 0
       for (let i = 0; i < tickResults.length; ++i) {
         if (tickResults[i].didClear) {
           chainFX(audioContext, i, tickResults[i].chainNumber)
         }
+        if (tickResults[i].didLand || tickResults[i].didJiggle) {
+          impactOffset += 1 + 2000 * i
+        }
       }
-      if (tickResults.some((r) => r.didJiggle || r.didLand)) {
-        audioContext.impact()
+      if (impactOffset) {
+        audioContext.impact(impactOffset)
       }
     }
     gameAge++
