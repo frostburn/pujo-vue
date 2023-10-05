@@ -146,6 +146,25 @@ const heartD = transformPath('M 0 1 C 1.8 0 0 -1 0 0 C 0 -1 -1.8 0 0 1 Z', 0.3, 
 const smallStarD = transformPath(starD, -0.6, 0, -0.015)
 const smallMoonD = transformPath(moonD, -0.6)
 const smallDiamondD = transformPath(diamondD, -0.6)
+
+// Win counter
+const trophyD = transformPath(
+  'M 0.5 0 c 0 -1 1 0 0 0 z' +
+    'M -0.5 0 c -1 0 0 -1 0 0 z' +
+    'M 0.3 1' +
+    'C 0.5 -0.5' +
+    '  1.1 0.8' +
+    '  1.1 -0.6' +
+    'H -1.1' +
+    'C -1.1 0.8' +
+    '  -0.5 -0.5' +
+    '  -0.3 1' +
+    'q -0.3 0 -0.3 0.3' +
+    'H 0.6' +
+    'q 0 -0.3 -0.3 -0.3' +
+    'Z',
+  0.35
+)
 </script>
 
 <template>
@@ -337,6 +356,9 @@ const smallDiamondD = transformPath(diamondD, -0.6)
           <tspan x="0" dy="1em">opponent...</tspan>
         </text>
       </g>
+
+      <!--Win indicator-->
+      <path id="trophy" :d="trophyD" fill="gold" stroke="goldenrod" stroke-width="0.04"></path>
     </defs>
   </svg>
 </template>
