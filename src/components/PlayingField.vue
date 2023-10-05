@@ -496,17 +496,17 @@ const cursorLocked = ref(false)
 const cursorY = ref(1)
 
 const primaryFill = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_FILL
-    : FILLS[gameState.value[0].hand[0]]
+  gameState.value && gameState.value[0].hand.length
+    ? FILLS[gameState.value[0].hand[0]]
+    : MISSING_FILL
 )
 const primaryDropletFill = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_STROKE
-    : STROKES[gameState.value[0].hand[0]]
+  gameState.value && gameState.value[0].hand.length
+    ? STROKES[gameState.value[0].hand[0]]
+    : MISSING_STROKE
 )
 const primaryStroke = computed(() => {
-  if (cursor.value === null || !gameState.value || !gameState.value[0].hand.length) {
+  if (!cursor.value || !gameState.value || !gameState.value[0].hand.length) {
     return MISSING_STROKE
   }
   const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
@@ -516,46 +516,43 @@ const primaryStroke = computed(() => {
   return STROKES[gameState.value[0].hand[0]]
 })
 const primaryDarkStroke = computed(() =>
-  !gameState.value || !gameState.value[0].preview.length
-    ? MISSING_STROKE
-    : DARK_STROKES[gameState.value[0].preview[0]]
+  gameState.value && gameState.value[0].preview.length
+    ? DARK_STROKES[gameState.value[0].preview[0]]
+    : MISSING_STROKE
 )
 const primarySymbol = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_SYMBOL
-    : panelSymbol(gameState.value[0].hand[0])
+  gameState.value && gameState.value[0].hand.length
+    ? panelSymbol(gameState.value[0].hand[0])
+    : MISSING_SYMBOL
 )
 
 const secondaryFill = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_FILL
-    : FILLS[gameState.value[0].hand[1]]
+  gameState.value && gameState.value[0].hand.length
+    ? FILLS[gameState.value[0].hand[1]]
+    : MISSING_FILL
 )
 const secondaryStroke = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_STROKE
-    : STROKES[gameState.value[0].hand[1]]
+  gameState.value && gameState.value[0].hand.length
+    ? STROKES[gameState.value[0].hand[1]]
+    : MISSING_STROKE
 )
 const secondaryDarkStroke = computed(() =>
-  !gameState.value || !gameState.value[0].preview.length
-    ? MISSING_STROKE
-    : DARK_STROKES[gameState.value[0].preview[1]]
+  gameState.value && gameState.value[0].preview.length
+    ? DARK_STROKES[gameState.value[0].preview[1]]
+    : MISSING_STROKE
 )
 const secondarySymbol = computed(() =>
-  !gameState.value || !gameState.value[0].hand.length
-    ? MISSING_SYMBOL
-    : panelSymbol(gameState.value[0].hand[1])
+  gameState.value && gameState.value[0].hand.length
+    ? panelSymbol(gameState.value[0].hand[1])
+    : MISSING_SYMBOL
 )
 
-const cursorActive = computed(() => {
-  if (!gameState.value) {
-    return false
-  }
-  return !gameState.value[0].busy && !passing.value
-})
+const cursorActive = computed(() =>
+  gameState.value ? !gameState.value[0].busy && !passing.value : false
+)
 
 function kickCursor() {
-  if (!gameState.value || cursor.value === null) {
+  if (!gameState.value || !cursor.value) {
     return
   }
   let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
@@ -578,7 +575,7 @@ function commitMove(x1: number, y1: number, orientation: number) {
 }
 
 const primaryDropletY = computed(() => {
-  if (!gameState.value || cursor.value === null) {
+  if (!gameState.value || !cursor.value) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -589,7 +586,7 @@ const primaryDropletY = computed(() => {
   return bottom
 })
 const secondaryDropletY = computed(() => {
-  if (!gameState.value || cursor.value === null) {
+  if (!gameState.value || !cursor.value) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -603,7 +600,7 @@ const secondaryDropletY = computed(() => {
 })
 
 const preIgnitions = computed(() => {
-  if (!gameState.value || cursor.value == null) {
+  if (!gameState.value || !cursor.value) {
     return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
   }
   return mirrorGame!.games[0].screen
