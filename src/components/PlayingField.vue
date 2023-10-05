@@ -80,6 +80,13 @@ function onMessage(message: any) {
     moveQueues.forEach((queue) => (queue.length = 0))
     gameAge = 0
     gameStart = null
+    opponentBagTime = null
+    moveSent = false
+    chainCards[0].length = 0
+    chainCards[1].length = 0
+    passing.value = false
+    justPassed.value = false
+    opponentThinkingOpacity.value = 0
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
     }
@@ -107,6 +114,11 @@ function onMessage(message: any) {
   if (message.type === 'game result') {
     // TODO: Requeue manually #24
     setTimeout(() => websocket.requestGame(), 4000)
+    if (message.result === 'win') {
+      wins[0]++
+    } else if (message.result === 'loss') {
+      wins[1]++
+    }
   }
 }
 
@@ -120,6 +132,7 @@ const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 let mirrorGame: MultiplayerGame | null = null
 const passing = ref(false)
 const justPassed = ref(false)
+const wins = reactive([0, 0])
 
 let tickId: number | null = null
 
@@ -313,7 +326,7 @@ onUnmounted(() => {
 
 // Graphics
 
-const LEFT_SCREEN_X = 1
+const LEFT_SCREEN_X = 1.2
 const RIGHT_SCREEN_X = 11
 const SCREEN_Y = 1
 const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
@@ -677,19 +690,13 @@ const preIgnitions = computed(() => {
     </template>
     <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
     <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
-    <use
-      v-if="gameState && gameState[0].allClearBonus"
-      href="#all-clear"
-      :x="LEFT_SCREEN_X"
-      :y="SCREEN_Y"
-    ></use>
-    <use
-      v-if="gameState && gameState[1].allClearBonus"
-      href="#all-clear"
-      :x="RIGHT_SCREEN_X"
-      :y="SCREEN_Y"
-    ></use>
     <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
+      <use
+        v-if="gameState && gameState[playerIndex].allClearBonus"
+        href="#all-clear"
+        :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X"
+        :y="SCREEN_Y"
+      ></use>
       <!--Playing grid-->
       <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i">
         <animate
@@ -765,30 +772,19 @@ const preIgnitions = computed(() => {
       </g>
       <!--Chain indicators-->
       <g
-        v-for="(card, i) in chainCards[0]"
+        v-for="(card, i) in chainCards[playerIndex]"
         :key="i"
-        :transform="`translate(${LEFT_SCREEN_X + card.x}, ${SCREEN_Y + card.y})`"
+        :transform="`translate(${(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) + card.x}, ${
+          SCREEN_Y + card.y
+        })`"
       >
         <ChainCard :number="card.number" :age="card.age" />
       </g>
-      <g
-        v-for="(card, i) in chainCards[1]"
-        :key="i"
-        :transform="`translate(${RIGHT_SCREEN_X + card.x}, ${SCREEN_Y + card.y})`"
-      >
-        <ChainCard :number="card.number" :age="card.age" />
-      </g>
-      <!--Game Over indicators-->
+      <!--Game Over indicator-->
       <use
-        v-if="gameState && gameState[0].lockedOut"
+        v-if="gameState && gameState[playerIndex].lockedOut"
         href="#game-over"
-        :x="LEFT_SCREEN_X"
-        :y="SCREEN_Y"
-      ></use>
-      <use
-        v-if="gameState && gameState[1].lockedOut"
-        href="#game-over"
-        :x="RIGHT_SCREEN_X"
+        :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X"
         :y="SCREEN_Y"
       ></use>
       <!--Garbage queue-->
@@ -804,14 +800,28 @@ const preIgnitions = computed(() => {
         <tspan class="score-label">Score:</tspan>
         <tspan class="score">{{ scores[playerIndex] }}</tspan>
       </text>
-      <!--Opponent thinking indicator-->
+      <!--Win counter-->
       <use
-        href="#thinking"
-        :x="RIGHT_SCREEN_X + 0.5"
-        :y="SCREEN_Y + 8"
-        :opacity="opponentThinkingOpacity"
+        href="#trophy"
+        :x="(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) - 0.7"
+        :y="SCREEN_Y + 10.8"
       ></use>
+      <text
+        class="score"
+        text-anchor="center"
+        :x="(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) - 0.9"
+        :y="SCREEN_Y + 12"
+      >
+        {{ wins[playerIndex] }}
+      </text>
     </template>
+    <!--Opponent thinking indicator-->
+    <use
+      href="#thinking"
+      :x="RIGHT_SCREEN_X + 0.5"
+      :y="SCREEN_Y + 8"
+      :opacity="opponentThinkingOpacity"
+    ></use>
     <g ref="cursorContainer" :transform="cursorTransform" :stroke-width="STROKE_WIDTH">
       <PlayingCursor
         ref="cursor"
