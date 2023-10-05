@@ -75,26 +75,23 @@ function onMessage(message: any) {
     }
   }
   if (message.type === 'bag') {
+    message.player = identity ? 1 - message.player : message.player
     bagQueues[message.player].push(message.bag)
-    // Bags are unloaded before each move so this is just for the visuals
-    if (message.player === identity) {
-      if (LOG) {
-        console.log('Setting own bag')
-      }
-      moveSent = false
-      mirrorGame!.games[0].bag = [...message.bag]
-    } else {
+    if (!mirrorGame!.games[message.player].bag.length) {
+      mirrorGame!.games[message.player].bag = [...message.bag]
+    }
+    if (message.player === 1) {
       opponentBagTime = performance.now()
+    }
+    if (message.player === 0 && mirrorGame!.games[0].bag.length < 6) {
       if (LOG) {
-        console.log('Set opponent bag time to', opponentBagTime)
+        console.log('Setting own bag from message')
       }
-      if (!mirrorGame!.games[1].bag.length) {
-        // Always show the first bag of the opponent
-        mirrorGame!.games[1].bag = [...message.bag]
-      }
+      mirrorGame!.games[0].bag = [...message.bag]
     }
   }
   if (message.type === 'move') {
+    message.player = identity ? 1 - message.player : message.player
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
@@ -128,8 +125,7 @@ function tick() {
   }
 
   for (let i = 0; i < moveQueues.length; ++i) {
-    const j = identity ? 1 - i : i
-    if (!mirrorGame!.games[j].busy && moveQueues[i].length) {
+    if (!mirrorGame!.games[i].busy && moveQueues[i].length) {
       const move = moveQueues[i].shift()!
       const bag = bagQueues[i].shift()
       if (bag === undefined) {
@@ -139,15 +135,14 @@ function tick() {
         passing.value = true
       } else {
         passing.value = false
-        const player = identity ? 1 - move.player : move.player
-        if (player === 1) {
-          mirrorGame!.games[player].bag = bag
-          mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
-        } else {
-          const displayBag = mirrorGame!.games[player].bag
-          mirrorGame!.games[player].bag = bag
-          mirrorGame!.play(player, move.x1, move.y1, move.orientation, move.hardDrop)
-          mirrorGame!.games[player].bag = displayBag
+        mirrorGame!.games[i].bag = bag
+        mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+
+        if (i === 0 && mirrorGame!.games[i].bag.length < 6 && bagQueues[i].length) {
+          if (LOG) {
+            console.log('Setting own bag from queue')
+          }
+          mirrorGame!.games[i].bag = [...bagQueues[i][0]]
         }
       }
     }
@@ -219,7 +214,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     gameState.value = mirrorGame.state
   }
 
-  const moveReceived = moveQueues[1 - identity!].length
+  const moveReceived = moveQueues[1].length
   const waitingOnSelf = gameState.value && !gameState.value[0].busy
   const opponentResolving = gameState.value && gameState.value[1].busy
   const gameOver = gameState.value && gameState.value.some((s) => s.lockedOut)
