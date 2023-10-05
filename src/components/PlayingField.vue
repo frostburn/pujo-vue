@@ -49,6 +49,32 @@ const MAX_CHAIN_CARD_AGE = 100
 
 const GAME_TYPE: string = 'pausing'
 
+const CHANTS = [
+  "えいっ！",
+  "ファイヤー",
+  "アイスストーム",
+  "ダイアキュート",
+  "ブレインダムド",
+  "ジュゲム",
+  "ばよえ～ん",
+]
+
+let chantVoice: SpeechSynthesisVoice | undefined;
+
+function chooseJapan() {
+  speechSynthesis.getVoices().forEach(voice => {
+    if (chantVoice === undefined && voice.default) {
+      chantVoice = voice
+    }
+    if (voice.lang.includes("JP")) {
+      chantVoice = voice
+    }
+  })
+}
+
+speechSynthesis.addEventListener("voiceschanged", chooseJapan)
+
+
 // Server connection
 
 const websocket = useWebSocketStore()
@@ -179,6 +205,11 @@ function tick() {
             x: ignitionCenters[i][0],
             y: ignitionCenters[i][1]
           })
+          if (chantVoice !== undefined && i === 0) {
+            const utterance = new SpeechSynthesisUtterance(CHANTS[Math.min(CHANTS.length - 1, tickResults[i].chainNumber - 1)])
+            utterance.voice = chantVoice
+            speechSynthesis.speak(utterance)
+          }
         }
         // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
         if (
