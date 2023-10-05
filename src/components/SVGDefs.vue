@@ -300,6 +300,43 @@ const smallDiamondD = transformPath(diamondD, -0.6)
           <textPath href="#over-path" textLength="17%">Over</textPath>
         </text>
       </g>
+      <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="0.06"></feGaussianBlur>
+      </filter>
+      <g id="thinking">
+        <g>
+          <rect
+            x="-0.2"
+            y="-1.0"
+            width="5.5"
+            height="2.6"
+            rx="0.9"
+            ry="0.5"
+            fill="black"
+            filter="url(#blur)"
+          ></rect>
+          <rect
+            x="-0.25"
+            y="-1.1"
+            width="5.5"
+            height="2.6"
+            rx="0.9"
+            ry="0.5"
+            fill="rgba(230, 240, 256, 0.5)"
+            filter="url(#blur)"
+          ></rect>
+          <animate
+            attributeName="opacity"
+            values="0.9;0.7;0.9"
+            dur="1.5s"
+            repeatCount="indefinite"
+          ></animate>
+        </g>
+        <text class="waiting">
+          <tspan x="0">Waiting for</tspan>
+          <tspan x="0" dy="1em">opponent...</tspan>
+        </text>
+      </g>
     </defs>
   </svg>
 </template>
@@ -324,5 +361,27 @@ const smallDiamondD = transformPath(diamondD, -0.6)
   stroke-width: 0.035px;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+.waiting {
+  font:
+    bold 1px 'Arial',
+    sans-serif;
+  fill: cadetblue;
+  stroke: #234;
+  stroke-width: 0.035px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.score-label {
+  font:
+    bold 0.7px 'Arial',
+    sans-serif;
+  fill: azure;
+}
+.score {
+  font:
+    bold 0.7px 'Lucida Console',
+    monospace;
+  fill: azure;
 }
 </style>

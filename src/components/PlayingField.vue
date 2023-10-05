@@ -50,6 +50,7 @@ let identity: number | null = null
 // Silly linter is silly
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let moveSent = false
+let opponentBagTime: DOMHighResTimeStamp | null = null
 
 const bagQueues: number[][][] = [[], []]
 
@@ -82,9 +83,15 @@ function onMessage(message: any) {
       }
       moveSent = false
       mirrorGame!.games[0].bag = [...message.bag]
-    } else if (!mirrorGame!.games[1].bag.length) {
-      // Always show the first bag of the opponent
-      mirrorGame!.games[1].bag = [...message.bag]
+    } else {
+      opponentBagTime = performance.now()
+      if (LOG) {
+        console.log('Set opponent bag time to', opponentBagTime)
+      }
+      if (!mirrorGame!.games[1].bag.length) {
+        // Always show the first bag of the opponent
+        mirrorGame!.games[1].bag = [...message.bag]
+      }
     }
   }
   if (message.type === 'move') {
@@ -190,6 +197,7 @@ function tick() {
 const gameState = ref<GameState[] | null>(null)
 
 const fallMu = ref(0)
+const opponentThinkingOpacity = ref(0)
 
 let frameId: number | null = null
 
@@ -209,6 +217,18 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
   if (mirrorGame !== null) {
     gameState.value = mirrorGame.state
+  }
+
+  const moveReceived = moveQueues[1 - identity!].length
+  const waitingOnSelf = gameState.value && !gameState.value[0].busy
+  const opponentResolving = gameState.value && gameState.value[1].busy
+  const gameOver = gameState.value && gameState.value.some((s) => s.lockedOut)
+
+  // XXX: Fading depends on framerate
+  if (opponentBagTime === null || moveReceived || waitingOnSelf || opponentResolving || gameOver) {
+    opponentThinkingOpacity.value *= 0.7
+  } else if (drawTime - opponentBagTime > 1000) {
+    opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
   }
 
   frameId = window.requestAnimationFrame(draw)
@@ -688,6 +708,7 @@ const preIgnitions = computed(() => {
           stroke="none"
         ></use>
       </g>
+      <!--Game Over indicators-->
       <use
         v-if="gameState && gameState[0].lockedOut"
         href="#game-over"
@@ -713,6 +734,13 @@ const preIgnitions = computed(() => {
         <tspan class="score-label">Score:</tspan>
         <tspan class="score">{{ scores[playerIndex] }}</tspan>
       </text>
+      <!--Opponent thinking indicator-->
+      <use
+        href="#thinking"
+        :x="RIGHT_SCREEN_X + 0.5"
+        :y="SCREEN_Y + 8"
+        :opacity="opponentThinkingOpacity"
+      ></use>
     </template>
     <g ref="cursorContainer" :transform="cursorTransform" :stroke-width="STROKE_WIDTH">
       <PlayingCursor
@@ -758,17 +786,5 @@ const preIgnitions = computed(() => {
 <style scoped>
 svg {
   user-select: none;
-}
-.score-label {
-  font:
-    bold 0.7px 'Arial',
-    sans-serif;
-  fill: azure;
-}
-.score {
-  font:
-    bold 0.7px 'Lucida Console',
-    monospace;
-  fill: azure;
 }
 </style>
