@@ -16,9 +16,11 @@ const props = defineProps<{
   container: SVGGraphicsElement | null
   primaryFill: string
   primaryStroke: string
+  primaryDarkStroke: string
   primarySymbol: string
   secondaryFill: string
   secondaryStroke: string
+  secondaryDarkStroke: string
   secondarySymbol: string
   y: number
   locked: boolean
@@ -301,13 +303,13 @@ onUnmounted(() => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const pFill = computed(() => (!props.active || !props.locked ? 'none' : props.primaryFill))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const pStroke = computed(() => (props.active ? props.primaryStroke : 'gray'))
+const pStroke = computed(() => (props.active ? props.primaryStroke : props.primaryDarkStroke))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const pSymbolFill = computed(() => (props.locked ? props.primaryStroke : 'none'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const pStrokeWidth = computed(() => (props.active ? '' : '0.05'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const sStroke = computed(() => (props.active ? props.secondaryStroke : 'gray'))
+const sStroke = computed(() => (props.active ? props.secondaryStroke : props.secondaryDarkStroke))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sStrokeWidth = computed(() => (props.active ? '0.1' : '0.03'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

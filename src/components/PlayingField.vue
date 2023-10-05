@@ -231,7 +231,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 // User interaction goes here.
 function passOnEscape(event: KeyboardEvent) {
-  if (gameState.value === null || justPassed.value) {
+  if (!gameState.value || justPassed.value) {
     return
   }
   if (event.code === 'Escape' && !gameState.value[0].busy && gameState.value[1].busy) {
@@ -265,6 +265,7 @@ const LEFT_SCREEN_X = 1
 const RIGHT_SCREEN_X = 11
 const SCREEN_Y = 1
 const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
+const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
 const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
 const STROKE_WIDTH = 0.15
 const MISSING_FILL = 'black'
@@ -290,7 +291,7 @@ function getFill(colorIndex: number) {
 }
 
 const ghostAttrss = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return [[], []]
   }
   const result = []
@@ -331,7 +332,7 @@ const ghostAttrss = computed(() => {
 })
 
 const panelAttrss = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return [[], []]
   }
   const result = []
@@ -399,7 +400,7 @@ function panelSymbol(color: number, jiggle = false) {
 }
 
 const panelGlyphAttrss = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return [[], []]
   }
   const result = []
@@ -467,7 +468,7 @@ function garbageGlyph(symbol: string, late = false) {
 }
 
 const garbageGlyphss = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return [[], []]
   }
   const result: SVGAttributes[][] = []
@@ -479,7 +480,7 @@ const garbageGlyphss = computed(() => {
 })
 
 const scores = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return ['-', '-']
   }
   return gameState.value.map((state) => state.score)
@@ -495,17 +496,17 @@ const cursorLocked = ref(false)
 const cursorY = ref(1)
 
 const primaryFill = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_FILL
     : FILLS[gameState.value[0].hand[0]]
 )
 const primaryDropletFill = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_STROKE
     : STROKES[gameState.value[0].hand[0]]
 )
 const primaryStroke = computed(() => {
-  if (cursor.value === null || gameState.value === null || !gameState.value[0].hand.length) {
+  if (cursor.value === null || !gameState.value || !gameState.value[0].hand.length) {
     return MISSING_STROKE
   }
   const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
@@ -514,37 +515,47 @@ const primaryStroke = computed(() => {
   }
   return STROKES[gameState.value[0].hand[0]]
 })
+const primaryDarkStroke = computed(() =>
+  !gameState.value || !gameState.value[0].preview.length
+    ? MISSING_STROKE
+    : DARK_STROKES[gameState.value[0].preview[0]]
+)
 const primarySymbol = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_SYMBOL
     : panelSymbol(gameState.value[0].hand[0])
 )
 
 const secondaryFill = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_FILL
     : FILLS[gameState.value[0].hand[1]]
 )
 const secondaryStroke = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_STROKE
     : STROKES[gameState.value[0].hand[1]]
 )
+const secondaryDarkStroke = computed(() =>
+  !gameState.value || !gameState.value[0].preview.length
+    ? MISSING_STROKE
+    : DARK_STROKES[gameState.value[0].preview[1]]
+)
 const secondarySymbol = computed(() =>
-  gameState.value === null || !gameState.value[0].hand.length
+  !gameState.value || !gameState.value[0].hand.length
     ? MISSING_SYMBOL
     : panelSymbol(gameState.value[0].hand[1])
 )
 
 const cursorActive = computed(() => {
-  if (gameState.value === null) {
+  if (!gameState.value) {
     return false
   }
   return !gameState.value[0].busy && !passing.value
 })
 
 function kickCursor() {
-  if (gameState.value === null || cursor.value === null) {
+  if (!gameState.value || cursor.value === null) {
     return
   }
   let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
@@ -567,7 +578,7 @@ function commitMove(x1: number, y1: number, orientation: number) {
 }
 
 const primaryDropletY = computed(() => {
-  if (gameState.value === null || cursor.value === null) {
+  if (!gameState.value || cursor.value === null) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -578,7 +589,7 @@ const primaryDropletY = computed(() => {
   return bottom
 })
 const secondaryDropletY = computed(() => {
-  if (gameState.value === null || cursor.value === null) {
+  if (!gameState.value || cursor.value === null) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -592,7 +603,7 @@ const secondaryDropletY = computed(() => {
 })
 
 const preIgnitions = computed(() => {
-  if (gameState.value === null || cursor.value == null) {
+  if (!gameState.value || cursor.value == null) {
     return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
   }
   return mirrorGame!.games[0].screen
@@ -744,9 +755,11 @@ const preIgnitions = computed(() => {
         :container="cursorContainer"
         :primaryFill="primaryFill"
         :primaryStroke="primaryStroke"
+        :primaryDarkStroke="primaryDarkStroke"
         :primarySymbol="primarySymbol"
         :secondaryFill="secondaryFill"
         :secondaryStroke="secondaryStroke"
+        :secondaryDarkStroke="secondaryDarkStroke"
         :secondarySymbol="secondarySymbol"
         :locked="cursorLocked"
         :y="cursorY"
