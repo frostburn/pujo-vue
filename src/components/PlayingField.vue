@@ -14,10 +14,11 @@ import {
   YELLOW,
   combinedGarbageDisplay
 } from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, ref, type SVGAttributes } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, type SVGAttributes } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
+import ChainCard from './ChainCard.vue'
 import { chainFX } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 
@@ -36,6 +37,15 @@ type PassingMove = {
 }
 
 type Move = NormalMove | PassingMove
+
+type Chain = {
+  number: number
+  age: number
+  x: number
+  y: number
+}
+
+const MAX_CHAIN_CARD_AGE = 100
 
 const GAME_TYPE: string = 'pausing'
 
@@ -163,6 +173,12 @@ function tick() {
       for (let i = 0; i < tickResults.length; ++i) {
         if (tickResults[i].didClear) {
           chainFX(audioContext, i, tickResults[i].chainNumber)
+          chainCards[i].push({
+            number: tickResults[i].chainNumber,
+            age: 0,
+            x: ignitionCenters[i][0],
+            y: ignitionCenters[i][1]
+          })
         }
         // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
         if (
@@ -181,6 +197,14 @@ function tick() {
       if (plopOffset) {
         audioContext.plop(plopOffset)
       }
+      for (let j = 0; j < chainCards.length; ++j) {
+        for (let i = 0; i < chainCards[j].length; ++i) {
+          chainCards[j][i].age++
+        }
+        if (chainCards[j].length && chainCards[j][0].age > MAX_CHAIN_CARD_AGE) {
+          chainCards[j].shift()
+        }
+      }
     }
     gameAge++
   }
@@ -193,6 +217,11 @@ const gameState = ref<GameState[] | null>(null)
 
 const fallMu = ref(0)
 const opponentThinkingOpacity = ref(0)
+const ignitionCenters = [
+  [0, 0],
+  [0, 0]
+]
+const chainCards = reactive<Chain[][]>([[], []])
 
 let frameId: number | null = null
 
@@ -212,6 +241,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
   if (mirrorGame !== null) {
     gameState.value = mirrorGame.state
+    calculateIgnitionCenters()
   }
 
   const moveReceived = moveQueues[1].length
@@ -227,6 +257,28 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   }
 
   frameId = window.requestAnimationFrame(draw)
+}
+
+function calculateIgnitionCenters() {
+  if (!gameState.value) {
+    return
+  }
+  for (let i = 0; i < gameState.value.length; ++i) {
+    let numIgnitions = 0
+    let x = 0
+    let y = 0
+    gameState.value[i].screen.ignited.slice(WIDTH * (GHOST_Y + 1)).forEach((flag, index) => {
+      if (flag) {
+        x += index % WIDTH
+        y += Math.floor(index / WIDTH)
+        numIgnitions++
+      }
+    })
+    if (numIgnitions) {
+      ignitionCenters[i][0] = x / numIgnitions
+      ignitionCenters[i][1] = y / numIgnitions
+    }
+  }
 }
 
 // User interaction goes here.
@@ -710,6 +762,21 @@ const preIgnitions = computed(() => {
           :fill="previewStrokes[playerIndex][3]"
           stroke="none"
         ></use>
+      </g>
+      <!--Chain indicators-->
+      <g
+        v-for="(card, i) in chainCards[0]"
+        :key="i"
+        :transform="`translate(${LEFT_SCREEN_X + card.x}, ${SCREEN_Y + card.y})`"
+      >
+        <ChainCard :number="card.number" :age="card.age" />
+      </g>
+      <g
+        v-for="(card, i) in chainCards[1]"
+        :key="i"
+        :transform="`translate(${RIGHT_SCREEN_X + card.x}, ${SCREEN_Y + card.y})`"
+      >
+        <ChainCard :number="card.number" :age="card.age" />
       </g>
       <!--Game Over indicators-->
       <use

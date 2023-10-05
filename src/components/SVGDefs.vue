@@ -384,4 +384,12 @@ const smallDiamondD = transformPath(diamondD, -0.6)
     monospace;
   fill: azure;
 }
+.chain {
+  font:
+    bold 0.8px 'Arial',
+    sans-serif;
+  fill: #fee;
+  stroke: rgba(85, 83, 80, 0.7);
+  stroke-width: 0.04px;
+}
 </style>
