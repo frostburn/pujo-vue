@@ -1,3 +1,20 @@
+import { BLUE, GREEN, PURPLE, RED, YELLOW } from 'pujo-puyo-core'
+
+export type Chain = {
+  number: number
+  age: number
+  x: number
+  y: number
+}
+
+const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
+const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
+const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
+export const MISSING_FILL = 'black'
+export const MISSING_STROKE = '#0a0a0a'
+export const MISSING_SYMBOL = '#cross'
+export const STROKE_WIDTH = 0.15
+
 const ARC_SCALE_FLAGS = [true, true, false, false, false, true, true]
 const ARC_TRANSLATION_FLAGS = [false, false, false, false, false, true, true]
 
@@ -71,4 +88,40 @@ export function transformPath(d: string, scale = 1, dx = 0, dy = 0) {
     }
   })
   return transformed.join(' ')
+}
+
+export function getStroke(colorIndex: number, dark = false) {
+  if (colorIndex < 0) {
+    return 'none'
+  } else if (colorIndex < STROKES.length) {
+    if (dark) {
+      return DARK_STROKES[colorIndex]
+    }
+    return STROKES[colorIndex]
+  }
+  return 'white'
+}
+
+export function getFill(colorIndex: number) {
+  if (colorIndex < 0) {
+    return 'none'
+  } else if (colorIndex < FILLS.length) {
+    return FILLS[colorIndex]
+  }
+  return 'magenta'
+}
+
+export function panelSymbol(color: number, jiggle = false) {
+  if (color === RED) {
+    return jiggle ? '#jiggling-heart' : '#heart'
+  } else if (color === GREEN) {
+    return jiggle ? '#jiggling-circle' : '#small-circle'
+  } else if (color === YELLOW) {
+    return jiggle ? '#jiggling-star' : '#small-star'
+  } else if (color === BLUE) {
+    return jiggle ? '#jiggling-moon' : '#small-moon'
+  } else if (color === PURPLE) {
+    return jiggle ? '#jiggling-diamond' : '#small-diamond'
+  }
+  return ''
 }
