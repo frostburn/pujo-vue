@@ -1,26 +1,22 @@
 <script setup lang="ts">
-import {
-  BLUE,
-  GARBAGE,
-  GHOST_Y,
-  GREEN,
-  type GameState,
-  HEIGHT,
-  MultiplayerGame,
-  PURPLE,
-  RED,
-  VISIBLE_HEIGHT,
-  WIDTH,
-  YELLOW,
-  combinedGarbageDisplay
-} from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, reactive, ref, type SVGAttributes } from 'vue'
+import { GHOST_Y, type GameState, MultiplayerGame, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
-import ChainCard from './ChainCard.vue'
+import PlayingScreen from './PlayingScreen.vue'
 import { chainFX } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
+import {
+  getFill,
+  type Chain,
+  getStroke,
+  MISSING_FILL,
+  MISSING_STROKE,
+  MISSING_SYMBOL,
+  panelSymbol,
+  STROKE_WIDTH
+} from '@/util'
 
 // === Type definitions ===
 
@@ -40,18 +36,11 @@ type PassingMove = {
 
 type Move = NormalMove | PassingMove
 
-type Chain = {
-  number: number
-  age: number
-  x: number
-  y: number
-}
-
 // === Constants ===
 
 const MAX_CHAIN_CARD_AGE = 100
 
-const GAME_TYPE: string = 'pausing'
+const GAME_TYPE: 'pausing' | 'realtime' = 'pausing'
 
 const LOG = false
 
@@ -63,13 +52,6 @@ const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 const LEFT_SCREEN_X = 1.2
 const RIGHT_SCREEN_X = 11
 const SCREEN_Y = 1
-const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
-const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
-const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
-const STROKE_WIDTH = 0.15
-const MISSING_FILL = 'black'
-const MISSING_STROKE = '#0a0a0a'
-const MISSING_SYMBOL = '#cross'
 
 // === State ===
 
@@ -96,7 +78,7 @@ let gameStart: DOMHighResTimeStamp | null = null
 let lastTickTime: DOMHighResTimeStamp | null = null
 
 // Drawing / graphics
-const gameState = ref<GameState[] | null>(null)
+const gameStates = ref<GameState[] | null>(null)
 const fallMu = ref(0)
 const opponentThinkingOpacity = ref(0)
 const ignitionCenters = [
@@ -271,14 +253,14 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   }
 
   if (mirrorGame !== null) {
-    gameState.value = mirrorGame.state
+    gameStates.value = mirrorGame.state
     calculateIgnitionCenters()
   }
 
   const moveReceived = moveQueues[1].length
-  const waitingOnSelf = gameState.value && !gameState.value[0].busy
-  const opponentResolving = gameState.value && gameState.value[1].busy
-  const gameOver = gameState.value && gameState.value.some((s) => s.lockedOut)
+  const waitingOnSelf = gameStates.value && !gameStates.value[0].busy
+  const opponentResolving = gameStates.value && gameStates.value[1].busy
+  const gameOver = gameStates.value && gameStates.value.some((s) => s.lockedOut)
 
   // XXX: Fading depends on framerate
   if (opponentBagTime === null || moveReceived || waitingOnSelf || opponentResolving || gameOver) {
@@ -291,14 +273,14 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 }
 
 function calculateIgnitionCenters() {
-  if (!gameState.value) {
+  if (!gameStates.value) {
     return
   }
-  for (let i = 0; i < gameState.value.length; ++i) {
+  for (let i = 0; i < gameStates.value.length; ++i) {
     let numIgnitions = 0
     let x = 0
     let y = 0
-    gameState.value[i].screen.ignited.slice(WIDTH * (GHOST_Y + 1)).forEach((flag, index) => {
+    gameStates.value[i].screen.ignited.slice(WIDTH * (GHOST_Y + 1)).forEach((flag, index) => {
       if (flag) {
         x += index % WIDTH
         y += Math.floor(index / WIDTH)
@@ -314,10 +296,10 @@ function calculateIgnitionCenters() {
 
 // User interaction goes here.
 function passOnEscape(event: KeyboardEvent) {
-  if (!gameState.value || justPassed.value) {
+  if (!gameStates.value || justPassed.value) {
     return
   }
-  if (event.code === 'Escape' && !gameState.value[0].busy && gameState.value[1].busy) {
+  if (event.code === 'Escape' && !gameStates.value[0].busy && gameStates.value[1].busy) {
     justPassed.value = true
     websocket.passMove()
   }
@@ -344,282 +326,68 @@ onUnmounted(() => {
 
 // Graphics
 
-function getStroke(colorIndex: number) {
-  if (colorIndex < 0) {
-    return 'none'
-  } else if (colorIndex < STROKES.length) {
-    return STROKES[colorIndex]
-  }
-  return 'white'
-}
-
-function getFill(colorIndex: number) {
-  if (colorIndex < 0) {
-    return 'none'
-  } else if (colorIndex < FILLS.length) {
-    return FILLS[colorIndex]
-  }
-  return 'magenta'
-}
-
-const ghostAttrss = computed(() => {
-  if (!gameState.value) {
-    return [[], []]
-  }
-  const result = []
-  let xOffset = LEFT_SCREEN_X
-  for (const state of gameState.value) {
-    const screen = state.screen
-    const panels: SVGAttributes[] = []
-    for (let index = WIDTH * GHOST_Y; index < WIDTH * (GHOST_Y + 1); ++index) {
-      const x = (index % WIDTH) + 0.5 + xOffset
-      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
-      let stroke = getStroke(screen.grid[index])
-      if (screen.falling[index] && GAME_TYPE === 'realtime') {
-        y += fallMu.value
-      }
-      let href = ''
-      if (screen.grid[index] === GARBAGE) {
-        href = '#garbage'
-      } else if (screen.grid[index] >= 0) {
-        href = '#panel0'
-      }
-      panels.push({
-        href,
-        x,
-        y,
-        fill: 'none',
-        stroke,
-        'stroke-width': STROKE_WIDTH * 0.5,
-        'stroke-dasharray': '0.1 0.108',
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        mask: 'url(#fade-mask)'
-      })
-    }
-    result.push(panels)
-    xOffset = RIGHT_SCREEN_X
-  }
-  return result
-})
-
-const panelAttrss = computed(() => {
-  if (!gameState.value) {
-    return [[], []]
-  }
-  const result = []
-  let xOffset = LEFT_SCREEN_X
-  for (const state of gameState.value) {
-    const screen = state.screen
-    const panels: SVGAttributes[] = []
-    for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
-      const x = (index % WIDTH) + 0.5 + xOffset
-      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
-      let fill = getFill(screen.grid[index])
-      let stroke = getStroke(screen.grid[index])
-      if (screen.falling[index] && GAME_TYPE === 'realtime') {
-        y += fallMu.value
-      }
-      if (screen.ignited[index]) {
-        fill = '#eed'
-      }
-      let href = ''
-      if (screen.grid[index] === GARBAGE) {
-        if (screen.sparking[index]) {
-          href = ''
-        } else if (screen.jiggling[index]) {
-          href = '#jiggling-garbage'
-        } else {
-          href = '#garbage'
-        }
-      } else if (screen.grid[index] >= 0) {
-        if (screen.sparking[index]) {
-          href = '#sparks'
-          fill = stroke
-          stroke = 'none'
-        } else {
-          href = `#panel${screen.connectivity[index]}`
-        }
-      }
-      panels.push({
-        href,
-        x,
-        y,
-        fill,
-        stroke,
-        'stroke-width': STROKE_WIDTH
-      })
-    }
-    result.push(panels)
-    xOffset = RIGHT_SCREEN_X
-  }
-  return result
-})
-
-function panelSymbol(color: number, jiggle = false) {
-  if (color === RED) {
-    return jiggle ? '#jiggling-heart' : '#heart'
-  } else if (color === GREEN) {
-    return jiggle ? '#jiggling-circle' : '#small-circle'
-  } else if (color === YELLOW) {
-    return jiggle ? '#jiggling-star' : '#small-star'
-  } else if (color === BLUE) {
-    return jiggle ? '#jiggling-moon' : '#small-moon'
-  } else if (color === PURPLE) {
-    return jiggle ? '#jiggling-diamond' : '#small-diamond'
-  }
-  return ''
-}
-
-const panelGlyphAttrss = computed(() => {
-  if (!gameState.value) {
-    return [[], []]
-  }
-  const result = []
-  let xOffset = LEFT_SCREEN_X
-  for (const state of gameState.value) {
-    const screen = state.screen
-    const glyphs: SVGAttributes[] = []
-    for (let index = WIDTH * (GHOST_Y + 1); index < WIDTH * HEIGHT; ++index) {
-      const x = (index % WIDTH) + 0.5 + xOffset
-      let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5 + SCREEN_Y
-      let fill = getStroke(screen.grid[index])
-      if (screen.falling[index] && GAME_TYPE === 'realtime') {
-        y += fallMu.value
-      }
-      let href = panelSymbol(screen.grid[index], screen.jiggling[index])
-      if (screen.sparking[index]) {
-        href = ''
-      }
-      glyphs.push({
-        href,
-        x,
-        y,
-        fill,
-        stroke: 'none'
-      })
-    }
-    result.push(glyphs)
-    xOffset = RIGHT_SCREEN_X
-  }
-  return result
-})
-
-function previewAttrs(mapping: (i: number) => string, fillValue: string) {
-  let result: string[][] = [[], []]
-  if (gameState.value !== null) {
-    result = gameState.value.map((state) => state.preview.map(mapping))
-  }
-  for (let i = 0; i < result.length; ++i) {
-    while (result[i].length < 4) {
-      result[i].push(fillValue)
-    }
-  }
-  return result
-}
-
-const previewFills = computed(() => previewAttrs((i) => FILLS[i], MISSING_FILL))
-
-const previewStrokes = computed(() => previewAttrs((i) => STROKES[i], MISSING_STROKE))
-
-const previewSymbols = computed(() => previewAttrs((i) => panelSymbol(i), MISSING_SYMBOL))
-
-function garbageGlyph(symbol: string, late = false) {
-  if (symbol === 'rock') {
-    symbol = 'spade'
-  } else if (symbol === 'crown') {
-    symbol = 'diamond'
-  }
-  return {
-    href: `#${symbol}`,
-    fill: FILLS[GARBAGE],
-    stroke: STROKES[GARBAGE],
-    'stroke-width': STROKE_WIDTH,
-    opacity: late ? '0.5' : '1.0'
-  }
-}
-
-const garbageGlyphss = computed(() => {
-  if (!gameState.value) {
-    return [[], []]
-  }
-  const result: SVGAttributes[][] = []
-  for (const state of gameState.value) {
-    const { pending, late } = combinedGarbageDisplay(state.pendingGarbage, state.lateGarbage)
-    result.push(pending.map((s) => garbageGlyph(s)).concat(late.map((s) => garbageGlyph(s, true))))
-  }
-  return result
-})
-
-const scores = computed(() => {
-  if (!gameState.value) {
-    return ['-', '-']
-  }
-  return gameState.value.map((state) => state.score)
-})
-
 const primaryFill = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? FILLS[gameState.value[0].hand[0]]
+  gameStates.value && gameStates.value[0].hand.length
+    ? getFill(gameStates.value[0].hand[0])
     : MISSING_FILL
 )
 const primaryDropletFill = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? STROKES[gameState.value[0].hand[0]]
+  gameStates.value && gameStates.value[0].hand.length
+    ? getStroke(gameStates.value[0].hand[0])
     : MISSING_STROKE
 )
 const primaryStroke = computed(() => {
-  if (!cursor.value || !gameState.value || !gameState.value[0].hand.length) {
+  if (!cursor.value || !gameStates.value || !gameStates.value[0].hand.length) {
     return MISSING_STROKE
   }
   const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
-  if (gameState.value[0].screen.grid[index] === gameState.value[0].hand[0]) {
+  if (gameStates.value[0].screen.grid[index] === gameStates.value[0].hand[0]) {
     return 'white'
   }
-  return STROKES[gameState.value[0].hand[0]]
+  return getStroke(gameStates.value[0].hand[0])
 })
 const primaryDarkStroke = computed(() =>
-  gameState.value && gameState.value[0].preview.length
-    ? DARK_STROKES[gameState.value[0].preview[0]]
+  gameStates.value && gameStates.value[0].preview.length
+    ? getStroke(gameStates.value[0].preview[0], true)
     : MISSING_STROKE
 )
 const primarySymbol = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? panelSymbol(gameState.value[0].hand[0])
+  gameStates.value && gameStates.value[0].hand.length
+    ? panelSymbol(gameStates.value[0].hand[0])
     : MISSING_SYMBOL
 )
 
 const secondaryFill = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? FILLS[gameState.value[0].hand[1]]
+  gameStates.value && gameStates.value[0].hand.length
+    ? getFill(gameStates.value[0].hand[1])
     : MISSING_FILL
 )
 const secondaryStroke = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? STROKES[gameState.value[0].hand[1]]
+  gameStates.value && gameStates.value[0].hand.length
+    ? getStroke(gameStates.value[0].hand[1])
     : MISSING_STROKE
 )
 const secondaryDarkStroke = computed(() =>
-  gameState.value && gameState.value[0].preview.length
-    ? DARK_STROKES[gameState.value[0].preview[1]]
+  gameStates.value && gameStates.value[0].preview.length
+    ? getStroke(gameStates.value[0].preview[1], true)
     : MISSING_STROKE
 )
 const secondarySymbol = computed(() =>
-  gameState.value && gameState.value[0].hand.length
-    ? panelSymbol(gameState.value[0].hand[1])
+  gameStates.value && gameStates.value[0].hand.length
+    ? panelSymbol(gameStates.value[0].hand[1])
     : MISSING_SYMBOL
 )
 
 const cursorActive = computed(() =>
-  gameState.value ? !gameState.value[0].busy && !passing.value : false
+  gameStates.value ? !gameStates.value[0].busy && !passing.value : false
 )
 
 function kickCursor() {
-  if (!gameState.value || !cursor.value) {
+  if (!gameStates.value || !cursor.value) {
     return
   }
   let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
-  while (gameState.value[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
+  while (gameStates.value[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
     index -= WIDTH
     cursorY.value -= 1
   }
@@ -638,7 +406,7 @@ function commitMove(x1: number, y1: number, orientation: number) {
 }
 
 const primaryDropletY = computed(() => {
-  if (!gameState.value || !cursor.value) {
+  if (!gameStates.value || !cursor.value) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -649,7 +417,7 @@ const primaryDropletY = computed(() => {
   return bottom
 })
 const secondaryDropletY = computed(() => {
-  if (!gameState.value || !cursor.value) {
+  if (!gameStates.value || !cursor.value) {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
@@ -663,17 +431,17 @@ const secondaryDropletY = computed(() => {
 })
 
 const preIgnitions = computed(() => {
-  if (!gameState.value || !cursor.value) {
+  if (!gameStates.value || !cursor.value) {
     return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
   }
   return mirrorGame!.games[0].screen
     .preIgnite(
       cursor.value.x,
       primaryDropletY.value + GHOST_Y + 1,
-      gameState.value[0].hand[0],
+      gameStates.value[0].hand[0],
       cursor.value.snapX,
       secondaryDropletY.value + GHOST_Y + 1,
-      gameState.value[0].hand[1]
+      gameStates.value[0].hand[1]
     )
     .slice(WIDTH * (GHOST_Y + 1))
 })
@@ -682,137 +450,26 @@ const preIgnitions = computed(() => {
 <template>
   <svg ref="svg" width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
     <SVGDefs />
-    <!--Ghost panels go behind the screens-->
-    <template v-for="(ghostAttrs, playerIndex) in ghostAttrss" :key="playerIndex">
-      <use v-for="(attrs, i) in ghostAttrs" v-bind="attrs" :key="i"></use>
-    </template>
-    <use href="#screen" :x="LEFT_SCREEN_X" :y="SCREEN_Y"></use>
-    <use href="#screen" :x="RIGHT_SCREEN_X" :y="SCREEN_Y"></use>
-    <template v-for="(panelAttrs, playerIndex) in panelAttrss" :key="playerIndex">
-      <use
-        v-if="gameState && gameState[playerIndex].allClearBonus"
-        href="#all-clear"
-        :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X"
-        :y="SCREEN_Y"
-      ></use>
-      <!--Playing grid-->
-      <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i">
-        <animate
-          v-if="playerIndex === 0 && preIgnitions[i]"
-          attributeName="fill"
-          values="#ffe;#bbb;#ffe"
-          dur="1s"
-          repeatCount="indefinite"
-        ></animate>
-      </use>
-      <use v-for="(attrs, i) in panelGlyphAttrss[playerIndex]" v-bind="attrs" :key="i"></use>
-      <!--Piece preview-->
-      <g :stroke-width="STROKE_WIDTH">
-        <use
-          href="#panel0"
-          y="2.5"
-          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :fill="previewFills[playerIndex][0]"
-          :stroke="previewStrokes[playerIndex][0]"
-        ></use>
-        <use
-          y="2.5"
-          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :href="previewSymbols[playerIndex][0]"
-          :fill="previewStrokes[playerIndex][0]"
-          stroke="none"
-        ></use>
-
-        <use
-          href="#panel0"
-          y="1.5"
-          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :fill="previewFills[playerIndex][1]"
-          :stroke="previewStrokes[playerIndex][1]"
-        ></use>
-        <use
-          y="1.5"
-          :x="WIDTH + 1 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :href="previewSymbols[playerIndex][1]"
-          :fill="previewStrokes[playerIndex][1]"
-          stroke="none"
-        ></use>
-
-        <use
-          href="#panel0"
-          y="4.7"
-          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :fill="previewFills[playerIndex][2]"
-          :stroke="previewStrokes[playerIndex][2]"
-        ></use>
-        <use
-          y="4.7"
-          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :href="previewSymbols[playerIndex][2]"
-          :fill="previewStrokes[playerIndex][2]"
-          stroke="none"
-        ></use>
-
-        <use
-          href="#panel0"
-          y="3.7"
-          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :fill="previewFills[playerIndex][3]"
-          :stroke="previewStrokes[playerIndex][3]"
-        ></use>
-        <use
-          y="3.7"
-          :x="WIDTH + 1.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-          :href="previewSymbols[playerIndex][3]"
-          :fill="previewStrokes[playerIndex][3]"
-          stroke="none"
-        ></use>
-      </g>
-      <!--Chain indicators-->
-      <g
-        v-for="(card, i) in chainCards[playerIndex]"
-        :key="i"
-        :transform="`translate(${(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) + card.x}, ${
-          SCREEN_Y + card.y
-        })`"
-      >
-        <ChainCard :number="card.number" :age="card.age" />
-      </g>
-      <!--Game Over indicator-->
-      <use
-        v-if="gameState && gameState[playerIndex].lockedOut"
-        href="#game-over"
-        :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X"
-        :y="SCREEN_Y"
-      ></use>
-      <!--Garbage queue-->
-      <use
-        v-for="(attrs, i) in garbageGlyphss[playerIndex]"
-        :key="i"
-        v-bind="attrs"
-        :x="i + 0.5 + (playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X)"
-        y="0"
-      ></use>
-      <!--Score-->
-      <text :x="playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X" :y="2 + VISIBLE_HEIGHT">
-        <tspan class="score-label">Score:</tspan>
-        <tspan class="score">{{ scores[playerIndex] }}</tspan>
-      </text>
-      <!--Win counter-->
-      <use
-        href="#trophy"
-        :x="(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) - 0.7"
-        :y="SCREEN_Y + 10.8"
-      ></use>
-      <text
-        class="score"
-        text-anchor="center"
-        :x="(playerIndex ? RIGHT_SCREEN_X : LEFT_SCREEN_X) - 0.9"
-        :y="SCREEN_Y + 12"
-      >
-        {{ wins[playerIndex] }}
-      </text>
-    </template>
+    <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
+      <PlayingScreen
+        :gameState="gameStates ? gameStates[0] : null"
+        :gameType="GAME_TYPE"
+        :fallMu="fallMu"
+        :preIgnitions="preIgnitions"
+        :chainCards="chainCards[0]"
+        :wins="wins[0]"
+      />
+    </g>
+    <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
+      <PlayingScreen
+        :gameState="gameStates ? gameStates[1] : null"
+        :gameType="GAME_TYPE"
+        :fallMu="fallMu"
+        :preIgnitions="null"
+        :chainCards="chainCards[1]"
+        :wins="wins[1]"
+      />
+    </g>
     <!--Opponent thinking indicator-->
     <use
       href="#thinking"
