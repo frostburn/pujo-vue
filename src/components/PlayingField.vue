@@ -22,6 +22,8 @@ import ChainCard from './ChainCard.vue'
 import { chainFX } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 
+// === Type definitions ===
+
 type NormalMove = {
   player: number
   x1: number
@@ -45,26 +47,74 @@ type Chain = {
   y: number
 }
 
+// === Constants ===
+
 const MAX_CHAIN_CARD_AGE = 100
 
 const GAME_TYPE: string = 'pausing'
 
-// Server connection
-
-const websocket = useWebSocketStore()
-
 const LOG = false
 
-let identity: number | null = null
+// Frames per millisecond
+const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
+const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 
+// Graphics
+const LEFT_SCREEN_X = 1.2
+const RIGHT_SCREEN_X = 11
+const SCREEN_Y = 1
+const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
+const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
+const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
+const STROKE_WIDTH = 0.15
+const MISSING_FILL = 'black'
+const MISSING_STROKE = '#0a0a0a'
+const MISSING_SYMBOL = '#cross'
+
+// === State ===
+
+// Server connection
+const websocket = useWebSocketStore()
+let identity: number | null = null
 // Silly linter is silly
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let moveSent = false
 let opponentBagTime: DOMHighResTimeStamp | null = null
-
 const bagQueues: number[][][] = [[], []]
-
 const moveQueues: Move[][] = [[], []]
+
+const audioContext = useAudioContextStore()
+
+// Engine: The game is merely a mirror driven by the server.
+let mirrorGame: MultiplayerGame | null = null
+const passing = ref(false)
+const justPassed = ref(false)
+const wins = reactive([0, 0])
+let tickId: number | null = null
+let gameAge = 0
+let gameStart: DOMHighResTimeStamp | null = null
+let lastTickTime: DOMHighResTimeStamp | null = null
+
+// Drawing / graphics
+const gameState = ref<GameState[] | null>(null)
+const fallMu = ref(0)
+const opponentThinkingOpacity = ref(0)
+const ignitionCenters = [
+  [0, 0],
+  [0, 0]
+]
+const chainCards = reactive<Chain[][]>([[], []])
+let frameId: number | null = null
+let start: DOMHighResTimeStamp | null = null
+
+const svg = ref<SVGSVGElement | null>(null)
+const cursorContainer = ref<SVGGraphicsElement | null>(null)
+const cursor = ref<typeof PlayingCursor | null>(null)
+
+const cursorLocked = ref(false)
+const cursorY = ref(1)
+
+// Server connection
 
 // The main App is responsible for requesting the game once everything has mounted and the connection has been established.
 function onMessage(message: any) {
@@ -121,24 +171,6 @@ function onMessage(message: any) {
     }
   }
 }
-
-const audioContext = useAudioContextStore()
-
-// Frames per millisecond
-const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
-const MS_PER_FRAME = 1 / GAME_FRAME_RATE
-
-// This is merely a mirror driven by the server.
-let mirrorGame: MultiplayerGame | null = null
-const passing = ref(false)
-const justPassed = ref(false)
-const wins = reactive([0, 0])
-
-let tickId: number | null = null
-
-let gameAge = 0
-let gameStart: DOMHighResTimeStamp | null = null
-let lastTickTime: DOMHighResTimeStamp | null = null
 
 // Game logic goes here and runs independent of animation.
 function tick() {
@@ -226,20 +258,6 @@ function tick() {
   tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
 }
 
-const gameState = ref<GameState[] | null>(null)
-
-const fallMu = ref(0)
-const opponentThinkingOpacity = ref(0)
-const ignitionCenters = [
-  [0, 0],
-  [0, 0]
-]
-const chainCards = reactive<Chain[][]>([[], []])
-
-let frameId: number | null = null
-
-let start: DOMHighResTimeStamp | null = null
-
 // Animation goes here.
 function draw(timeStamp: DOMHighResTimeStamp) {
   if (start === null) {
@@ -325,17 +343,6 @@ onUnmounted(() => {
 })
 
 // Graphics
-
-const LEFT_SCREEN_X = 1.2
-const RIGHT_SCREEN_X = 11
-const SCREEN_Y = 1
-const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
-const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
-const FILLS = ['#922', '#292', '#882', '#229', '#828', 'rgba(30, 255, 255, 0.94)']
-const STROKE_WIDTH = 0.15
-const MISSING_FILL = 'black'
-const MISSING_STROKE = '#0a0a0a'
-const MISSING_SYMBOL = '#cross'
 
 function getStroke(colorIndex: number) {
   if (colorIndex < 0) {
@@ -550,15 +557,6 @@ const scores = computed(() => {
   }
   return gameState.value.map((state) => state.score)
 })
-
-const svg = ref<SVGSVGElement | null>(null)
-const cursorContainer = ref<SVGGraphicsElement | null>(null)
-const cursor = ref<typeof PlayingCursor | null>(null)
-
-const cursorTransform = `translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`
-
-const cursorLocked = ref(false)
-const cursorY = ref(1)
 
 const primaryFill = computed(() =>
   gameState.value && gameState.value[0].hand.length
@@ -822,7 +820,11 @@ const preIgnitions = computed(() => {
       :y="SCREEN_Y + 8"
       :opacity="opponentThinkingOpacity"
     ></use>
-    <g ref="cursorContainer" :transform="cursorTransform" :stroke-width="STROKE_WIDTH">
+    <g
+      ref="cursorContainer"
+      :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`"
+      :stroke-width="STROKE_WIDTH"
+    >
       <PlayingCursor
         ref="cursor"
         :svg="svg"
