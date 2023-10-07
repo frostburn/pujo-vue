@@ -4,6 +4,7 @@ import PlayingField from './components/PlayingField.vue'
 import { onMounted, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useAudioContextStore } from './stores/audio-context'
+import ReplayEditor from './components/ReplayEditor.vue';
 
 const WS_URL = 'ws://localhost:3003'
 
@@ -48,7 +49,8 @@ onUnmounted(() => {
 
 <template>
   <div class="field-container">
-    <PlayingField />
+    <!-- <PlayingField /> -->
+    <ReplayEditor />
   </div>
 </template>
 

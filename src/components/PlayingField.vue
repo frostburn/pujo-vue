@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GHOST_Y, type GameState, MultiplayerGame, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { GHOST_Y, type GameState, MultiplayerGame, VISIBLE_HEIGHT, WIDTH, type Replay, replayToAlgebraic } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
@@ -36,13 +36,20 @@ type PassingMove = {
 
 type Move = NormalMove | PassingMove
 
+const replay: Replay = {
+  gameSeed: -1,
+  screenSeed: -1,
+  colorSelection: [],
+  moves: []
+}
+
 // === Constants ===
 
 const MAX_CHAIN_CARD_AGE = 100
 
 const GAME_TYPE: 'pausing' | 'realtime' = 'pausing'
 
-const LOG = false
+const LOG = true
 
 // Frames per millisecond
 const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
@@ -108,6 +115,10 @@ function onMessage(message: any) {
   }
   if (message.type === 'game params') {
     mirrorGame = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    replay.gameSeed = -1
+    replay.colorSelection = message.colorSelection
+    replay.screenSeed = message.screenSeed
+    replay.moves.length = 0
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameAge = 0
@@ -151,6 +162,9 @@ function onMessage(message: any) {
     } else if (message.result === 'loss') {
       wins[1]++
     }
+    replay.gameSeed = message.gameSeed
+    console.log(JSON.stringify(replay))
+    // console.log(replayToAlgebraic(replay).join(' '))
   }
 }
 
@@ -173,7 +187,8 @@ function tick() {
       } else {
         passing.value = false
         mirrorGame!.games[i].bag = bag
-        mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        const playedMove = mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        replay.moves.push(playedMove)
 
         if (i === 0 && mirrorGame!.games[i].bag.length < 6 && bagQueues[i].length) {
           if (LOG) {
