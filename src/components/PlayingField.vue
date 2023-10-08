@@ -25,6 +25,7 @@ import {
   STROKE_WIDTH,
   getVersionInfo
 } from '@/util'
+import PlayingButton from './PlayingButton.vue'
 
 // === Type definitions ===
 
@@ -59,7 +60,9 @@ const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 // Graphics
 const LEFT_SCREEN_X = 1.2
 const RIGHT_SCREEN_X = 11
-const SCREEN_Y = 1
+const SCREEN_Y = 2
+const CONTROLS_X = RIGHT_SCREEN_X + WIDTH + 1
+const CONTROLS_Y = SCREEN_Y + 5
 
 // === State ===
 
@@ -110,6 +113,8 @@ const cursor = ref<typeof PlayingCursor | null>(null)
 const cursorLocked = ref(false)
 const cursorY = ref(1)
 
+const canRequeue = ref(false)
+
 // Server connection
 
 // The main App is responsible for requesting the game once everything has mounted and the connection has been established.
@@ -137,6 +142,7 @@ function onMessage(message: any) {
     chainCards[1].length = 0
     passing.value = false
     justPassed.value = false
+    canRequeue.value = false
     opponentThinkingOpacity.value = 0
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
@@ -169,13 +175,12 @@ function onMessage(message: any) {
       replay: replay
     }
     localStorage.setItem('replays.latest', JSON.stringify(replayContainer))
-    // TODO: Requeue manually #24
-    setTimeout(() => websocket.requestGame(), 4000)
     if (message.result === 'win') {
       wins[0]++
     } else if (message.result === 'loss') {
       wins[1]++
     }
+    canRequeue.value = true
   }
 }
 
@@ -321,13 +326,23 @@ function calculateIgnitionCenters() {
 }
 
 // User interaction goes here.
-function passOnEscape(event: KeyboardEvent) {
-  if (!gameStates.value || justPassed.value) {
+
+const canPass = computed(
+  () =>
+    gameStates.value && !justPassed.value && !gameStates.value[0].busy && gameStates.value[1].busy
+)
+
+function pass() {
+  if (!canPass.value) {
     return
   }
-  if (event.code === 'Escape' && !gameStates.value[0].busy && gameStates.value[1].busy) {
-    justPassed.value = true
-    websocket.passMove()
+  justPassed.value = true
+  websocket.passMove()
+}
+
+function passOnEscape(event: KeyboardEvent) {
+  if (event.code === 'Escape') {
+    pass()
   }
 }
 
@@ -471,6 +486,12 @@ const preIgnitions = computed(() => {
     )
     .slice(WIDTH * (GHOST_Y + 1))
 })
+
+function requeue() {
+  if (canRequeue.value) {
+    websocket.requestGame()
+  }
+}
 </script>
 
 <template>
@@ -545,11 +566,34 @@ const preIgnitions = computed(() => {
         opacity="0.7"
       ></circle>
     </g>
+    <g :class="{ control: true, active: canPass }" @mousedown.stop @click="pass">
+      <rect :x="LEFT_SCREEN_X + WIDTH + 2" :y="SCREEN_Y - 0.1" rx="0.1" width="1" height="2"></rect>
+      <text class="pass" :y="SCREEN_Y + 0.5">
+        <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5">P</tspan>
+        <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5" dy="0.35">a</tspan>
+        <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5" dy="0.35">s</tspan>
+        <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5" dy="0.35">s</tspan>
+      </text>
+    </g>
+    <g @mousedown.stop>
+      <PlayingButton
+        :class="{ active: canRequeue }"
+        @click.stop="requeue"
+        :x="CONTROLS_X"
+        :y="CONTROLS_Y"
+        text="Requeue"
+      />
+    </g>
   </svg>
 </template>
 
 <style scoped>
 svg {
   user-select: none;
+}
+.pass tspan {
+  font:
+    bold 0.45px 'Arial',
+    sans-serif;
 }
 </style>

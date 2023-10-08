@@ -280,7 +280,7 @@ const score = computed(() => (props.gameState ? props.gameState.score.toString()
     ></use>
   </g>
   <!--Score-->
-  <text :y="VISIBLE_HEIGHT + 2">
+  <text :y="VISIBLE_HEIGHT + 1">
     <tspan class="score-label">Score:</tspan>
     <tspan class="score">{{ score }}</tspan>
   </text>

@@ -414,4 +414,26 @@ const trophyD = transformPath(
   stroke: rgba(85, 83, 80, 0.7);
   stroke-width: 0.04px;
 }
+.control {
+  fill: #444;
+  stroke: #333;
+  cursor: not-allowed;
+  stroke-width: 0.11;
+}
+.control text {
+  fill: #221;
+  stroke: none;
+  font:
+    bold 0.5px 'Arial',
+    sans-serif;
+  text-anchor: middle;
+}
+.control.active {
+  fill: burlywood;
+  stroke: sienna;
+  cursor: pointer;
+}
+.control.active text {
+  fill: #110;
+}
 </style>

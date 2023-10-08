@@ -60,7 +60,7 @@ header {
 
 .field-container {
   height: 800px;
-  width: 1000px;
+  width: 1200px;
 }
 
 nav {

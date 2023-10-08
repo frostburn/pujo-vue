@@ -282,7 +282,6 @@ function onKeyUp(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('mousemove', onMouseMove)
 
-  // TODO: Limit to SVG element
   document.addEventListener('mousedown', onMouseDown)
   document.addEventListener('mouseup', onMouseUp)
 
