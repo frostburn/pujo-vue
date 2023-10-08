@@ -87,8 +87,8 @@ const passing = ref(false)
 const justPassed = ref(false)
 const wins = reactive([0, 0])
 let tickId: number | null = null
-let gameAge = 0
-let gameStart: DOMHighResTimeStamp | null = null
+let referenceAge = 0
+let referenceTime: DOMHighResTimeStamp | null = null
 let lastTickTime: DOMHighResTimeStamp | null = null
 
 // Drawing / graphics
@@ -101,7 +101,7 @@ const ignitionCenters = [
 ]
 const chainCards = reactive<Chain[][]>([[], []])
 let frameId: number | null = null
-let start: DOMHighResTimeStamp | null = null
+let lastAgeDrawn = -1
 
 const svg = ref<SVGSVGElement | null>(null)
 const cursorContainer = ref<SVGGraphicsElement | null>(null)
@@ -127,8 +127,10 @@ function onMessage(message: any) {
     replay.moves.length = 0
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
-    gameAge = 0
-    gameStart = null
+    referenceAge = 0
+    referenceTime = null
+    lastTickTime = null
+    lastAgeDrawn = -1
     opponentBagTime = null
     moveSent = false
     chainCards[0].length = 0
@@ -180,8 +182,8 @@ function onMessage(message: any) {
 // Game logic goes here and runs independent of animation.
 function tick() {
   const timeStamp = window.performance.now()
-  if (gameStart === null) {
-    gameStart = timeStamp
+  if (referenceTime === null) {
+    referenceTime = timeStamp
   }
 
   for (let i = 0; i < moveQueues.length; ++i) {
@@ -197,6 +199,7 @@ function tick() {
         passing.value = false
         mirrorGame!.games[i].bag = bag
         const playedMove = mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        lastAgeDrawn = -1
         replay.moves.push(playedMove)
 
         if (i === 0 && mirrorGame!.games[i].bag.length < 6 && bagQueues[i].length) {
@@ -209,8 +212,8 @@ function tick() {
     }
   }
 
-  const intendedAge = (timeStamp - gameStart) * GAME_FRAME_RATE
-  while (gameAge < intendedAge) {
+  const intendedAge = (timeStamp - referenceTime) * GAME_FRAME_RATE
+  while (referenceAge < intendedAge) {
     if (
       mirrorGame!.games.every((game) => game.busy) ||
       (passing.value && mirrorGame!.games.some((game) => game.busy))
@@ -257,28 +260,27 @@ function tick() {
         }
       }
     }
-    gameAge++
+    referenceAge++
   }
-  const nextTickTime = gameAge * MS_PER_FRAME + gameStart
+  const nextTickTime = referenceAge * MS_PER_FRAME + referenceTime
   lastTickTime = window.performance.now()
   tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
 }
 
 // Animation goes here.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function draw(timeStamp: DOMHighResTimeStamp) {
-  if (start === null) {
-    start = timeStamp
-  }
   const drawTime = window.performance.now()
-  if (lastTickTime === null) {
+  if (lastTickTime === null || GAME_TYPE === 'pausing') {
     fallMu.value = 0
-  } else {
+  } else if (GAME_TYPE === 'realtime') {
     fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * GAME_FRAME_RATE))
   }
 
-  if (mirrorGame !== null) {
+  if (mirrorGame !== null && (!gameStates.value || lastAgeDrawn !== mirrorGame.age)) {
     gameStates.value = mirrorGame.state
     calculateIgnitionCenters()
+    lastAgeDrawn = mirrorGame.age
   }
 
   const moveReceived = moveQueues[1].length
@@ -477,7 +479,6 @@ const preIgnitions = computed(() => {
     <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
       <PlayingScreen
         :gameState="gameStates ? gameStates[0] : null"
-        :gameType="GAME_TYPE"
         :fallMu="fallMu"
         :preIgnitions="preIgnitions"
         :chainCards="chainCards[0]"
@@ -487,7 +488,6 @@ const preIgnitions = computed(() => {
     <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
       <PlayingScreen
         :gameState="gameStates ? gameStates[1] : null"
-        :gameType="GAME_TYPE"
         :fallMu="fallMu"
         :preIgnitions="null"
         :chainCards="chainCards[1]"

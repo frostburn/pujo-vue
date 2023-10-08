@@ -23,7 +23,6 @@ import ChainCard from './ChainCard.vue'
 
 const props = defineProps<{
   gameState: GameState | null
-  gameType: 'realtime' | 'pausing'
   fallMu: number
   preIgnitions: boolean[] | null
   chainCards: Chain[]
@@ -40,7 +39,7 @@ const ghostAttrs = computed(() => {
     const x = (index % WIDTH) + 0.5
     let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5
     let stroke = getStroke(screen.grid[index])
-    if (screen.falling[index] && props.gameType === 'realtime') {
+    if (screen.falling[index]) {
       y += props.fallMu
     }
     let href = ''
@@ -76,7 +75,7 @@ const panelAttrs = computed(() => {
     let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5
     let fill = getFill(screen.grid[index])
     let stroke = getStroke(screen.grid[index])
-    if (screen.falling[index] && props.gameType === 'realtime') {
+    if (screen.falling[index]) {
       y += props.fallMu
     }
     if (screen.ignited[index]) {
@@ -122,7 +121,7 @@ const panelGlyphAttrs = computed(() => {
     const x = (index % WIDTH) + 0.5
     let y = Math.floor(index / WIDTH) - GHOST_Y - 0.5
     let fill = getStroke(screen.grid[index])
-    if (screen.falling[index] && props.gameType === 'realtime') {
+    if (screen.falling[index]) {
       y += props.fallMu
     }
     let href = panelSymbol(screen.grid[index], screen.jiggling[index])
