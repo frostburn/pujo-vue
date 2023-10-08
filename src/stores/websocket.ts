@@ -64,12 +64,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.send(JSON.stringify({ type: 'simple state request' }))
   }
 
-  function makeMove(x1: number, y1: number, orientation: number, kickDown = false) {
+  function makeMove(x1: number, y1: number, orientation: number, hardDrop = false) {
     if (guard()) {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, kickDown }))
+    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, hardDrop }))
   }
 
   function passMove() {

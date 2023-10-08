@@ -5,7 +5,8 @@ import {
   MultiplayerGame,
   VISIBLE_HEIGHT,
   WIDTH,
-  type Replay
+  type Replay,
+  JKISS32
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
@@ -49,13 +50,7 @@ type Move = NormalMove | PassingMove
 
 const MAX_CHAIN_CARD_AGE = 100
 
-const GAME_TYPE: 'pausing' | 'realtime' = 'pausing'
-
 const LOG = false
-
-// Frames per millisecond
-const GAME_FRAME_RATE = 45 / 1000 // Pausing runs (catches up) 50% faster than realtime
-const MS_PER_FRAME = 1 / GAME_FRAME_RATE
 
 // Graphics
 const LEFT_SCREEN_X = 1.2
@@ -78,8 +73,12 @@ const moveQueues: Move[][] = [[], []]
 
 const audioContext = useAudioContextStore()
 
-// Engine: The game is merely a mirror driven by the server.
-let mirrorGame: MultiplayerGame | null = null
+// Frames per millisecond
+const gameFrameRate = ref(45 / 1000) // This is 50% faster than realtime
+const msPerFrame = computed(() => 1 / gameFrameRate.value)
+const gameType = ref<'pausing' | 'realtime'>('pausing')
+// Engine: In pausing mode the game is merely a mirror driven by the server.
+let game: MultiplayerGame | null = null
 const replay: Replay = {
   gameSeed: -1,
   screenSeed: -1,
@@ -126,12 +125,14 @@ function onMessage(message: any) {
     identity = message.player
   }
   if (message.type === 'game params') {
-    mirrorGame = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
     replay.moves.length = 0
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
+    gameFrameRate.value = 45 / 1000
+    gameType.value = 'pausing'
     referenceAge = 0
     referenceTime = null
     lastTickTime = null
@@ -146,22 +147,25 @@ function onMessage(message: any) {
     opponentThinkingOpacity.value = 0
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
+    } else {
+      window.clearTimeout(tickId)
+      tickId = window.setTimeout(tick, 100)
     }
   }
   if (message.type === 'bag') {
     message.player = identity ? 1 - message.player : message.player
     bagQueues[message.player].push(message.bag)
-    if (!mirrorGame!.games[message.player].bag.length) {
-      mirrorGame!.games[message.player].bag = [...message.bag]
+    if (!game!.games[message.player].bag.length) {
+      game!.games[message.player].bag = [...message.bag]
     }
     if (message.player === 1) {
       opponentBagTime = performance.now()
     }
-    if (message.player === 0 && mirrorGame!.games[0].bag.length < 6) {
+    if (message.player === 0 && game!.games[0].bag.length < 6) {
       if (LOG) {
         console.log('Setting own bag from message')
       }
-      mirrorGame!.games[0].bag = [...message.bag]
+      game!.games[0].bag = [...message.bag]
     }
   }
   if (message.type === 'move') {
@@ -181,18 +185,29 @@ function onMessage(message: any) {
       wins[1]++
     }
     canRequeue.value = true
+    gameFrameRate.value = 30 / 1000
+    gameType.value = 'realtime'
+    referenceTime = null
+    referenceAge = 0
+    if (game) {
+      // This is basically brain surgery just to keep playing
+      game.games[0].jkiss = new JKISS32()
+    }
   }
 }
 
 // Game logic goes here and runs independent of animation.
 function tick() {
+  if (!game) {
+    return
+  }
   const timeStamp = window.performance.now()
   if (referenceTime === null) {
     referenceTime = timeStamp
   }
 
   for (let i = 0; i < moveQueues.length; ++i) {
-    if (!mirrorGame!.games[i].busy && moveQueues[i].length) {
+    if (!game.games[i].busy && moveQueues[i].length) {
       const move = moveQueues[i].shift()!
       const bag = bagQueues[i].shift()
       if (bag === undefined) {
@@ -202,28 +217,29 @@ function tick() {
         passing.value = true
       } else {
         passing.value = false
-        mirrorGame!.games[i].bag = bag
-        const playedMove = mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        game.games[i].bag = bag
+        const playedMove = game.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
         lastAgeDrawn = -1
         replay.moves.push(playedMove)
 
-        if (i === 0 && mirrorGame!.games[i].bag.length < 6 && bagQueues[i].length) {
+        if (i === 0 && game.games[i].bag.length < 6 && bagQueues[i].length) {
           if (LOG) {
             console.log('Setting own bag from queue')
           }
-          mirrorGame!.games[i].bag = [...bagQueues[i][0]]
+          game.games[i].bag = [...bagQueues[i][0]]
         }
       }
     }
   }
 
-  const intendedAge = (timeStamp - referenceTime) * GAME_FRAME_RATE
+  const intendedAge = (timeStamp - referenceTime) * gameFrameRate.value
   while (referenceAge < intendedAge) {
     if (
-      mirrorGame!.games.every((game) => game.busy) ||
-      (passing.value && mirrorGame!.games.some((game) => game.busy))
+      game.games.every((game) => game.busy) ||
+      (passing.value && game.games.some((game) => game.busy)) ||
+      gameType.value === 'realtime'
     ) {
-      const tickResults = mirrorGame!.tick()
+      const tickResults = game.tick()
       if (tickResults.every((r) => !r.busy)) {
         passing.value = false
       }
@@ -267,7 +283,7 @@ function tick() {
     }
     referenceAge++
   }
-  const nextTickTime = referenceAge * MS_PER_FRAME + referenceTime
+  const nextTickTime = referenceAge * msPerFrame.value + referenceTime
   lastTickTime = window.performance.now()
   tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
 }
@@ -276,16 +292,16 @@ function tick() {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function draw(timeStamp: DOMHighResTimeStamp) {
   const drawTime = window.performance.now()
-  if (lastTickTime === null || GAME_TYPE === 'pausing') {
+  if (lastTickTime === null || gameType.value === 'pausing') {
     fallMu.value = 0
-  } else if (GAME_TYPE === 'realtime') {
-    fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * GAME_FRAME_RATE))
+  } else if (gameType.value === 'realtime') {
+    fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * gameFrameRate.value))
   }
 
-  if (mirrorGame !== null && (!gameStates.value || lastAgeDrawn !== mirrorGame.age)) {
-    gameStates.value = mirrorGame.state
+  if (game !== null && (!gameStates.value || lastAgeDrawn !== game.age)) {
+    gameStates.value = game.state
     calculateIgnitionCenters()
-    lastAgeDrawn = mirrorGame.age
+    lastAgeDrawn = game.age
   }
 
   const moveReceived = moveQueues[1].length
@@ -329,7 +345,11 @@ function calculateIgnitionCenters() {
 
 const canPass = computed(
   () =>
-    gameStates.value && !justPassed.value && !gameStates.value[0].busy && gameStates.value[1].busy
+    gameStates.value &&
+    !justPassed.value &&
+    !gameStates.value[0].busy &&
+    gameStates.value[1].busy &&
+    gameType.value === 'pausing'
 )
 
 function pass() {
@@ -440,9 +460,14 @@ function lockCursor() {
 }
 
 function commitMove(x1: number, y1: number, orientation: number) {
-  websocket.makeMove(x1, y1, orientation)
+  if (gameType.value === 'pausing') {
+    websocket.makeMove(x1, y1, orientation)
+    moveSent = true
+  } else if (game) {
+    const playedMove = game.play(0, x1, y1, orientation)
+    replay.moves.push(playedMove)
+  }
   justPassed.value = false
-  moveSent = true
   cursorLocked.value = false
 }
 
@@ -451,7 +476,7 @@ const primaryDropletY = computed(() => {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
-    mirrorGame!.games[0].screen.dropPuyo(cursor.value.x, cursorY.value + GHOST_Y + 1) - GHOST_Y - 1
+    game!.games[0].screen.dropPuyo(cursor.value.x, cursorY.value + GHOST_Y + 1) - GHOST_Y - 1
   if (cursor.value.x === cursor.value.snapX && cursor.value.snapY > cursorY.value) {
     return bottom - 1
   }
@@ -462,7 +487,7 @@ const secondaryDropletY = computed(() => {
     return VISIBLE_HEIGHT - 1
   }
   const bottom =
-    mirrorGame!.games[0].screen.dropPuyo(cursor.value.snapX, cursor.value.snapY + GHOST_Y + 1) -
+    game!.games[0].screen.dropPuyo(cursor.value.snapX, cursor.value.snapY + GHOST_Y + 1) -
     GHOST_Y -
     1
   if (cursor.value.x === cursor.value.snapX && cursor.value.snapY < cursorY.value) {
@@ -475,7 +500,7 @@ const preIgnitions = computed(() => {
   if (!gameStates.value || !cursor.value) {
     return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
   }
-  return mirrorGame!.games[0].screen
+  return game!.games[0].screen
     .preIgnite(
       cursor.value.x,
       primaryDropletY.value + GHOST_Y + 1,
