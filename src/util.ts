@@ -1,4 +1,6 @@
 import { BLUE, GREEN, PURPLE, RED, YELLOW } from 'pujo-puyo-core'
+import { version } from '../package.json'
+import { packages } from '../package-lock.json'
 
 export type Chain = {
   number: number
@@ -124,4 +126,15 @@ export function panelSymbol(color: number, jiggle = false) {
     return jiggle ? '#jiggling-diamond' : '#small-diamond'
   }
   return ''
+}
+
+export function getVersionInfo() {
+  const core = packages['node_modules/pujo-puyo-core']
+  return {
+    version,
+    core: {
+      version: core.version,
+      resolved: core.resolved
+    }
+  }
 }

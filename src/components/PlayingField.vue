@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { GHOST_Y, type GameState, MultiplayerGame, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import {
+  GHOST_Y,
+  type GameState,
+  MultiplayerGame,
+  VISIBLE_HEIGHT,
+  WIDTH,
+  type Replay
+} from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import { useWebSocketStore } from '@/stores/websocket'
@@ -15,7 +22,8 @@ import {
   MISSING_STROKE,
   MISSING_SYMBOL,
   panelSymbol,
-  STROKE_WIDTH
+  STROKE_WIDTH,
+  getVersionInfo
 } from '@/util'
 
 // === Type definitions ===
@@ -69,6 +77,12 @@ const audioContext = useAudioContextStore()
 
 // Engine: The game is merely a mirror driven by the server.
 let mirrorGame: MultiplayerGame | null = null
+const replay: Replay = {
+  gameSeed: -1,
+  screenSeed: -1,
+  colorSelection: [],
+  moves: []
+}
 const passing = ref(false)
 const justPassed = ref(false)
 const wins = reactive([0, 0])
@@ -108,6 +122,9 @@ function onMessage(message: any) {
   }
   if (message.type === 'game params') {
     mirrorGame = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    replay.colorSelection = message.colorSelection
+    replay.screenSeed = message.screenSeed
+    replay.moves.length = 0
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameAge = 0
@@ -144,6 +161,12 @@ function onMessage(message: any) {
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
+    replay.gameSeed = message.gameSeed
+    const replayContainer = {
+      versionInfo: getVersionInfo(),
+      replay: replay
+    }
+    localStorage.setItem('replays.latest', JSON.stringify(replayContainer))
     // TODO: Requeue manually #24
     setTimeout(() => websocket.requestGame(), 4000)
     if (message.result === 'win') {
@@ -173,7 +196,8 @@ function tick() {
       } else {
         passing.value = false
         mirrorGame!.games[i].bag = bag
-        mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        const playedMove = mirrorGame!.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        replay.moves.push(playedMove)
 
         if (i === 0 && mirrorGame!.games[i].bag.length < 6 && bagQueues[i].length) {
           if (LOG) {
