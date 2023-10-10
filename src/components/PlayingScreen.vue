@@ -4,7 +4,6 @@ import {
   getFill,
   getStroke,
   panelSymbol,
-  type Chain,
   MISSING_FILL,
   MISSING_STROKE,
   MISSING_SYMBOL
@@ -20,6 +19,7 @@ import {
 } from 'pujo-puyo-core'
 import { computed, type SVGAttributes } from 'vue'
 import ChainCard from './ChainCard.vue'
+import type { Chain } from '@/chain-deck'
 
 const props = defineProps<{
   gameState: GameState | null
@@ -286,7 +286,7 @@ const score = computed(() => (props.gameState ? props.gameState.score.toString()
   </text>
   <!--Win counter-->
   <use href="#trophy" x="-0.7" y="10.8"></use>
-  <text class="score" text-anchor="center" :x="-0.9" :y="12">
+  <text class="score" text-anchor="middle" :x="-0.7" :y="12">
     {{ wins }}
   </text>
 </template>

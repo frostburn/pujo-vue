@@ -2,12 +2,11 @@ import { BLUE, GREEN, PURPLE, RED, YELLOW } from 'pujo-puyo-core'
 import { version } from '../package.json'
 import { packages } from '../package-lock.json'
 
-export type Chain = {
-  number: number
-  age: number
-  x: number
-  y: number
-}
+declare const __COMMIT_HASH__: string
+
+export const LEFT_SCREEN_X = 1.2
+export const RIGHT_SCREEN_X = 11
+export const SCREEN_Y = 2
 
 const STROKES = ['#d22', '#2d2', '#dd2', '#22e', '#d2c', 'rgba(20, 160, 160, 0.88)']
 const DARK_STROKES = ['#522', '#252', '#552', '#226', '#524', 'rgba(20, 80, 80, 0.88)']
@@ -132,6 +131,7 @@ export function getVersionInfo() {
   const core = packages['node_modules/pujo-puyo-core']
   return {
     version,
+    resolved: __COMMIT_HASH__,
     core: {
       version: core.version,
       resolved: core.resolved

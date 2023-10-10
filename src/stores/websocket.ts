@@ -50,10 +50,21 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
   function requestGame() {
     if (guard()) {
+      // eslint-disable-next-line no-inner-declarations
+      function requestOnOpen() {
+        const socket = webSocket.value!
+        socket.send(
+          JSON.stringify({ type: 'game request', name: localStorage.getItem('name') || undefined })
+        )
+        removeOpenListener(requestOnOpen)
+      }
+      addOpenListener(requestOnOpen)
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'game request' }))
+    socket.send(
+      JSON.stringify({ type: 'game request', name: localStorage.getItem('name') || undefined })
+    )
   }
 
   function requestState() {
