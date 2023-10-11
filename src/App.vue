@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import PlayingField from './components/PlayingField.vue'
-
 import { onMounted, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useAudioContextStore } from './stores/audio-context'
@@ -12,7 +10,6 @@ const audioContext = useAudioContextStore()
 
 function hello() {
   console.log(`Websocket opened to ${WS_URL}`)
-  websocket.requestGame()
 }
 
 function initializeAudio() {
@@ -47,27 +44,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="field-container">
-    <PlayingField />
-  </div>
+  <nav>
+    <RouterLink to="/">Home</RouterLink>
+    <RouterLink to="/about">About</RouterLink>
+    <RouterLink to="/play-online">Play Online</RouterLink>
+    <RouterLink to="/replay">Replay</RouterLink>
+  </nav>
+  <RouterView />
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.field-container {
-  height: 800px;
-  width: 1200px;
-}
-
 nav {
   width: 100%;
   font-size: 12px;
   text-align: center;
-  margin-top: 2rem;
 }
 
 nav a.router-link-exact-active {
@@ -86,28 +76,5 @@ nav a {
 
 nav a:first-of-type {
   border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
 }
 </style>

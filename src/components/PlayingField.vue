@@ -1,109 +1,43 @@
 <script setup lang="ts">
-import {
-  GHOST_Y,
-  type GameState,
-  MultiplayerGame,
-  VISIBLE_HEIGHT,
-  WIDTH,
-  type Replay,
-  JKISS32
-} from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { GHOST_Y, type GameState, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SVGDefs from './SVGDefs.vue'
-import { useWebSocketStore } from '@/stores/websocket'
 import PlayingCursor from './PlayingCursor.vue'
 import PlayingScreen from './PlayingScreen.vue'
-import { chainFX } from '@/soundFX'
-import { useAudioContextStore } from '@/stores/audio-context'
 import {
   getFill,
-  type Chain,
   getStroke,
   MISSING_FILL,
   MISSING_STROKE,
   MISSING_SYMBOL,
   panelSymbol,
   STROKE_WIDTH,
-  getVersionInfo
+  LEFT_SCREEN_X,
+  RIGHT_SCREEN_X,
+  SCREEN_Y
 } from '@/util'
 import PlayingButton from './PlayingButton.vue'
+import type { Chain } from '@/chain-deck'
 
-// === Type definitions ===
+const props = defineProps<{
+  gameStates: GameState[] | null
+  chainCards: Chain[][]
+  wins: number[]
+  canPass: boolean
+  passing: boolean
+  canRequeue: boolean
+  fallMu: number
+  opponentThinkingOpacity: number
+  justPassed: boolean
+  primaryDropletY: number
+  secondaryDropletY: number
+  preIgnitions: boolean[]
+}>()
 
-type NormalMove = {
-  player: number
-  x1: number
-  y1: number
-  orientation: number
-  hardDrop: boolean
-  pass: false
-}
+const emit = defineEmits(['pass', 'commit', 'requeue'])
 
-type PassingMove = {
-  player: number
-  pass: true
-}
-
-type Move = NormalMove | PassingMove
-
-// === Constants ===
-
-const MAX_CHAIN_CARD_AGE = 100
-
-const LOG = false
-
-// Graphics
-const LEFT_SCREEN_X = 1.2
-const RIGHT_SCREEN_X = 11
-const SCREEN_Y = 2
 const CONTROLS_X = RIGHT_SCREEN_X + WIDTH + 1
 const CONTROLS_Y = SCREEN_Y + 5
-
-// === State ===
-
-// Server connection
-const websocket = useWebSocketStore()
-let identity: number | null = null
-// Silly linter is silly
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-let moveSent = false
-let opponentBagTime: DOMHighResTimeStamp | null = null
-const bagQueues: number[][][] = [[], []]
-const moveQueues: Move[][] = [[], []]
-
-const audioContext = useAudioContextStore()
-
-// Frames per millisecond
-const gameFrameRate = ref(45 / 1000) // This is 50% faster than realtime
-const msPerFrame = computed(() => 1 / gameFrameRate.value)
-const gameType = ref<'pausing' | 'realtime'>('pausing')
-// Engine: In pausing mode the game is merely a mirror driven by the server.
-let game: MultiplayerGame | null = null
-const replay: Replay = {
-  gameSeed: -1,
-  screenSeed: -1,
-  colorSelection: [],
-  moves: []
-}
-const passing = ref(false)
-const justPassed = ref(false)
-const wins = reactive([0, 0])
-let tickId: number | null = null
-let referenceAge = 0
-let referenceTime: DOMHighResTimeStamp | null = null
-let lastTickTime: DOMHighResTimeStamp | null = null
-
-// Drawing / graphics
-const gameStates = ref<GameState[] | null>(null)
-const fallMu = ref(0)
-const opponentThinkingOpacity = ref(0)
-const ignitionCenters = [
-  [0, 0],
-  [0, 0]
-]
-const chainCards = reactive<Chain[][]>([[], []])
-let frameId: number | null = null
-let lastAgeDrawn = -1
 
 const svg = ref<SVGSVGElement | null>(null)
 const cursorContainer = ref<SVGGraphicsElement | null>(null)
@@ -112,252 +46,13 @@ const cursor = ref<typeof PlayingCursor | null>(null)
 const cursorLocked = ref(false)
 const cursorY = ref(1)
 
-const canRequeue = ref(false)
-
-// Server connection
-
-// The main App is responsible for requesting the game once everything has mounted and the connection has been established.
-function onMessage(message: any) {
-  if (LOG) {
-    console.log(message)
-  }
-  if (message.type === 'identity') {
-    identity = message.player
-  }
-  if (message.type === 'game params') {
-    game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
-    replay.colorSelection = message.colorSelection
-    replay.screenSeed = message.screenSeed
-    replay.moves.length = 0
-    bagQueues.forEach((queue) => (queue.length = 0))
-    moveQueues.forEach((queue) => (queue.length = 0))
-    gameFrameRate.value = 45 / 1000
-    gameType.value = 'pausing'
-    referenceAge = 0
-    referenceTime = null
-    lastTickTime = null
-    lastAgeDrawn = -1
-    opponentBagTime = null
-    moveSent = false
-    chainCards[0].length = 0
-    chainCards[1].length = 0
-    passing.value = false
-    justPassed.value = false
-    canRequeue.value = false
-    opponentThinkingOpacity.value = 0
-    if (tickId === null) {
-      tickId = window.setTimeout(tick, 1)
-    } else {
-      window.clearTimeout(tickId)
-      tickId = window.setTimeout(tick, 100)
-    }
-  }
-  if (message.type === 'bag') {
-    message.player = identity ? 1 - message.player : message.player
-    bagQueues[message.player].push(message.bag)
-    if (!game!.games[message.player].bag.length) {
-      game!.games[message.player].bag = [...message.bag]
-    }
-    if (message.player === 1) {
-      opponentBagTime = performance.now()
-    }
-    if (message.player === 0 && game!.games[0].bag.length < 6) {
-      if (LOG) {
-        console.log('Setting own bag from message')
-      }
-      game!.games[0].bag = [...message.bag]
-    }
-  }
-  if (message.type === 'move') {
-    message.player = identity ? 1 - message.player : message.player
-    moveQueues[message.player].push(message)
-  }
-  if (message.type === 'game result') {
-    replay.gameSeed = message.gameSeed
-    const replayContainer = {
-      versionInfo: getVersionInfo(),
-      replay: replay
-    }
-    localStorage.setItem('replays.latest', JSON.stringify(replayContainer))
-    if (message.result === 'win') {
-      wins[0]++
-    } else if (message.result === 'loss') {
-      wins[1]++
-    }
-    canRequeue.value = true
-    gameFrameRate.value = 30 / 1000
-    gameType.value = 'realtime'
-    referenceTime = null
-    referenceAge = 0
-    if (game) {
-      // This is basically brain surgery just to keep playing
-      game.games[0].jkiss = new JKISS32()
-    }
-  }
-}
-
-// Game logic goes here and runs independent of animation.
-function tick() {
-  if (!game) {
-    return
-  }
-  const timeStamp = window.performance.now()
-  if (referenceTime === null) {
-    referenceTime = timeStamp
-  }
-
-  for (let i = 0; i < moveQueues.length; ++i) {
-    if (!game.games[i].busy && moveQueues[i].length) {
-      const move = moveQueues[i].shift()!
-      const bag = bagQueues[i].shift()
-      if (bag === undefined) {
-        throw new Error('Bag queue desync')
-      }
-      if (move.pass) {
-        passing.value = true
-      } else {
-        passing.value = false
-        game.games[i].bag = bag
-        const playedMove = game.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
-        lastAgeDrawn = -1
-        replay.moves.push(playedMove)
-
-        if (i === 0 && game.games[i].bag.length < 6 && bagQueues[i].length) {
-          if (LOG) {
-            console.log('Setting own bag from queue')
-          }
-          game.games[i].bag = [...bagQueues[i][0]]
-        }
-      }
-    }
-  }
-
-  const intendedAge = (timeStamp - referenceTime) * gameFrameRate.value
-  while (referenceAge < intendedAge) {
-    if (
-      game.games.every((game) => game.busy) ||
-      (passing.value && game.games.some((game) => game.busy)) ||
-      gameType.value === 'realtime'
-    ) {
-      const tickResults = game.tick()
-      if (tickResults.every((r) => !r.busy)) {
-        passing.value = false
-      }
-      let impactOffset = 0
-      let plopOffset = 0
-      for (let i = 0; i < tickResults.length; ++i) {
-        if (tickResults[i].didClear) {
-          chainFX(audioContext, i, tickResults[i].chainNumber)
-          chainCards[i].push({
-            number: tickResults[i].chainNumber,
-            age: 0,
-            x: ignitionCenters[i][0],
-            y: ignitionCenters[i][1]
-          })
-        }
-        // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
-        if (
-          tickResults[i].coloredLanded ||
-          (tickResults[i].didJiggle && !tickResults[i].garbageLanded)
-        ) {
-          impactOffset += 1 + 2000 * i
-        }
-        if (tickResults[i].garbageLanded) {
-          plopOffset += 1 + 20 * i
-        }
-      }
-      if (impactOffset) {
-        audioContext.impact(impactOffset)
-      }
-      if (plopOffset) {
-        audioContext.plop(plopOffset)
-      }
-      for (let j = 0; j < chainCards.length; ++j) {
-        for (let i = 0; i < chainCards[j].length; ++i) {
-          chainCards[j][i].age++
-        }
-        if (chainCards[j].length && chainCards[j][0].age > MAX_CHAIN_CARD_AGE) {
-          chainCards[j].shift()
-        }
-      }
-    }
-    referenceAge++
-  }
-  const nextTickTime = referenceAge * msPerFrame.value + referenceTime
-  lastTickTime = window.performance.now()
-  tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
-}
-
-// Animation goes here.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function draw(timeStamp: DOMHighResTimeStamp) {
-  const drawTime = window.performance.now()
-  if (lastTickTime === null || gameType.value === 'pausing') {
-    fallMu.value = 0
-  } else if (gameType.value === 'realtime') {
-    fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * gameFrameRate.value))
-  }
-
-  if (game !== null && (!gameStates.value || lastAgeDrawn !== game.age)) {
-    gameStates.value = game.state
-    calculateIgnitionCenters()
-    lastAgeDrawn = game.age
-  }
-
-  const moveReceived = moveQueues[1].length
-  const waitingOnSelf = gameStates.value && !gameStates.value[0].busy
-  const opponentResolving = gameStates.value && gameStates.value[1].busy
-  const gameOver = gameStates.value && gameStates.value.some((s) => s.lockedOut)
-
-  // XXX: Fading depends on framerate
-  if (opponentBagTime === null || moveReceived || waitingOnSelf || opponentResolving || gameOver) {
-    opponentThinkingOpacity.value *= 0.7
-  } else if (drawTime - opponentBagTime > 1000) {
-    opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
-  }
-
-  frameId = window.requestAnimationFrame(draw)
-}
-
-function calculateIgnitionCenters() {
-  if (!gameStates.value) {
-    return
-  }
-  for (let i = 0; i < gameStates.value.length; ++i) {
-    let numIgnitions = 0
-    let x = 0
-    let y = 0
-    gameStates.value[i].screen.ignited.slice(WIDTH * (GHOST_Y + 1)).forEach((flag, index) => {
-      if (flag) {
-        x += index % WIDTH
-        y += Math.floor(index / WIDTH)
-        numIgnitions++
-      }
-    })
-    if (numIgnitions) {
-      ignitionCenters[i][0] = x / numIgnitions
-      ignitionCenters[i][1] = y / numIgnitions
-    }
-  }
-}
-
-// User interaction goes here.
-
-const canPass = computed(
-  () =>
-    gameStates.value &&
-    !justPassed.value &&
-    !gameStates.value[0].busy &&
-    gameStates.value[1].busy &&
-    gameType.value === 'pausing'
-)
+// User interaction.
 
 function pass() {
-  if (!canPass.value) {
+  if (!props.canPass) {
     return
   }
-  justPassed.value = true
-  websocket.passMove()
+  emit('pass')
 }
 
 function passOnEscape(event: KeyboardEvent) {
@@ -366,89 +61,78 @@ function passOnEscape(event: KeyboardEvent) {
   }
 }
 
-// Mount server connection, game loop and animation loop.
-
 onMounted(() => {
-  websocket.addMessageListener(onMessage)
-  frameId = window.requestAnimationFrame(draw)
   document.addEventListener('keydown', passOnEscape)
 })
 
 onUnmounted(() => {
-  websocket.removeMessageListener(onMessage)
-  if (tickId !== null) {
-    window.clearTimeout(tickId)
-  }
-  if (frameId !== null) {
-    window.cancelAnimationFrame(frameId)
-  }
   document.removeEventListener('keydown', passOnEscape)
 })
 
 // Graphics
 
 const primaryFill = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? getFill(gameStates.value[0].hand[0])
+  props.gameStates && props.gameStates[0].hand.length
+    ? getFill(props.gameStates[0].hand[0])
     : MISSING_FILL
 )
 const primaryDropletFill = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? getStroke(gameStates.value[0].hand[0])
+  props.gameStates && props.gameStates[0].hand.length
+    ? getStroke(props.gameStates[0].hand[0])
     : MISSING_STROKE
 )
 const primaryStroke = computed(() => {
-  if (!cursor.value || !gameStates.value || !gameStates.value[0].hand.length) {
+  if (!cursor.value || !props.gameStates || !props.gameStates[0].hand.length) {
     return MISSING_STROKE
   }
   const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
-  if (gameStates.value[0].screen.grid[index] === gameStates.value[0].hand[0]) {
+  if (props.gameStates[0].screen.grid[index] === props.gameStates[0].hand[0]) {
     return 'white'
   }
-  return getStroke(gameStates.value[0].hand[0])
+  return getStroke(props.gameStates[0].hand[0])
 })
 const primaryDarkStroke = computed(() =>
-  gameStates.value && gameStates.value[0].preview.length
-    ? getStroke(gameStates.value[0].preview[0], true)
+  props.gameStates && props.gameStates[0].preview.length
+    ? getStroke(props.gameStates[0].preview[0], true)
     : MISSING_STROKE
 )
 const primarySymbol = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? panelSymbol(gameStates.value[0].hand[0])
+  props.gameStates && props.gameStates[0].hand.length
+    ? panelSymbol(props.gameStates[0].hand[0])
     : MISSING_SYMBOL
 )
 
 const secondaryFill = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? getFill(gameStates.value[0].hand[1])
+  props.gameStates && props.gameStates[0].hand.length
+    ? getFill(props.gameStates[0].hand[1])
     : MISSING_FILL
 )
 const secondaryStroke = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? getStroke(gameStates.value[0].hand[1])
+  props.gameStates && props.gameStates[0].hand.length
+    ? getStroke(props.gameStates[0].hand[1])
     : MISSING_STROKE
 )
 const secondaryDarkStroke = computed(() =>
-  gameStates.value && gameStates.value[0].preview.length
-    ? getStroke(gameStates.value[0].preview[1], true)
+  props.gameStates && props.gameStates[0].preview.length
+    ? getStroke(props.gameStates[0].preview[1], true)
     : MISSING_STROKE
 )
 const secondarySymbol = computed(() =>
-  gameStates.value && gameStates.value[0].hand.length
-    ? panelSymbol(gameStates.value[0].hand[1])
+  props.gameStates && props.gameStates[0].hand.length
+    ? panelSymbol(props.gameStates[0].hand[1])
     : MISSING_SYMBOL
 )
 
 const cursorActive = computed(() =>
-  gameStates.value ? !gameStates.value[0].busy && !passing.value : false
+  props.gameStates ? !props.gameStates[0].busy && !props.passing : false
 )
 
 function kickCursor() {
-  if (!gameStates.value || !cursor.value) {
+  if (!props.gameStates || !cursor.value) {
     return
   }
   let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
-  while (gameStates.value[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
+  while (props.gameStates[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
     index -= WIDTH
     cursorY.value -= 1
   }
@@ -460,63 +144,38 @@ function lockCursor() {
 }
 
 function commitMove(x1: number, y1: number, orientation: number) {
-  if (gameType.value === 'pausing') {
-    websocket.makeMove(x1, y1, orientation)
-    moveSent = true
-  } else if (game) {
-    const playedMove = game.play(0, x1, y1, orientation)
-    replay.moves.push(playedMove)
-  }
-  justPassed.value = false
   cursorLocked.value = false
+  emit('commit', x1, y1, orientation)
 }
-
-const primaryDropletY = computed(() => {
-  if (!gameStates.value || !cursor.value) {
-    return VISIBLE_HEIGHT - 1
-  }
-  const bottom =
-    game!.games[0].screen.dropPuyo(cursor.value.x, cursorY.value + GHOST_Y + 1) - GHOST_Y - 1
-  if (cursor.value.x === cursor.value.snapX && cursor.value.snapY > cursorY.value) {
-    return bottom - 1
-  }
-  return bottom
-})
-const secondaryDropletY = computed(() => {
-  if (!gameStates.value || !cursor.value) {
-    return VISIBLE_HEIGHT - 1
-  }
-  const bottom =
-    game!.games[0].screen.dropPuyo(cursor.value.snapX, cursor.value.snapY + GHOST_Y + 1) -
-    GHOST_Y -
-    1
-  if (cursor.value.x === cursor.value.snapX && cursor.value.snapY < cursorY.value) {
-    return bottom - 1
-  }
-  return bottom
-})
-
-const preIgnitions = computed(() => {
-  if (!gameStates.value || !cursor.value) {
-    return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
-  }
-  return game!.games[0].screen
-    .preIgnite(
-      cursor.value.x,
-      primaryDropletY.value + GHOST_Y + 1,
-      gameStates.value[0].hand[0],
-      cursor.value.snapX,
-      secondaryDropletY.value + GHOST_Y + 1,
-      gameStates.value[0].hand[1]
-    )
-    .slice(WIDTH * (GHOST_Y + 1))
-})
 
 function requeue() {
-  if (canRequeue.value) {
-    websocket.requestGame()
+  if (props.canRequeue) {
+    emit('requeue')
   }
 }
+
+const x1 = computed<number>(() => {
+  if (!cursor.value) {
+    return 2
+  }
+  return cursor.value.x
+})
+
+const x2 = computed<number>(() => {
+  if (!cursor.value) {
+    return 2
+  }
+  return cursor.value.snapX
+})
+
+const y2 = computed<number>(() => {
+  if (!cursor.value) {
+    return VISIBLE_HEIGHT - 2
+  }
+  return cursor.value.snapY
+})
+
+defineExpose({ x1, y1: cursorY, x2, y2 })
 </script>
 
 <template>
