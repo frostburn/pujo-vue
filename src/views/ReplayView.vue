@@ -16,6 +16,7 @@ import { ChainDeck } from '@/chain-deck'
 // TODO: SoundFX
 
 // TODO: Store game type in replay and show hands for realtime
+// TODO: Always show hands at the end
 
 // In frames per millisecond.
 const NOMINAL_FRAME_RATE = 30 / 1000

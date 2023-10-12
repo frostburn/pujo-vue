@@ -16,16 +16,14 @@ import {
   RIGHT_SCREEN_X,
   SCREEN_Y
 } from '@/util'
-import PlayingButton from './PlayingButton.vue'
 import type { Chain } from '@/chain-deck'
 
 const props = defineProps<{
   gameStates: GameState[] | null
   chainCards: Chain[][]
   wins: number[]
-  canPass: boolean
+  canPass: boolean | null
   passing: boolean
-  canRequeue: boolean
   fallMu: number
   opponentThinkingOpacity: number
   justPassed: boolean
@@ -35,7 +33,7 @@ const props = defineProps<{
   timeouts: boolean[]
 }>()
 
-const emit = defineEmits(['pass', 'commit', 'requeue'])
+const emit = defineEmits(['pass', 'commit'])
 
 const CONTROLS_X = RIGHT_SCREEN_X + WIDTH + 1
 const CONTROLS_Y = SCREEN_Y + 5
@@ -50,10 +48,9 @@ const cursorY = ref(1)
 // User interaction.
 
 function pass() {
-  if (!props.canPass) {
-    return
+  if (props.canPass) {
+    emit('pass')
   }
-  emit('pass')
 }
 
 function passOnEscape(event: KeyboardEvent) {
@@ -147,12 +144,6 @@ function lockCursor() {
 function commitMove(x1: number, y1: number, orientation: number) {
   cursorLocked.value = false
   emit('commit', x1, y1, orientation)
-}
-
-function requeue() {
-  if (props.canRequeue) {
-    emit('requeue')
-  }
 }
 
 const x1 = computed<number>(() => {
@@ -255,7 +246,12 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         opacity="0.7"
       ></circle>
     </g>
-    <g :class="{ control: true, active: canPass }" @mousedown.stop @click="pass">
+    <g
+      v-if="canPass !== null"
+      :class="{ control: true, active: canPass, disabled: !canPass }"
+      @mousedown.stop
+      @click="pass"
+    >
       <rect :x="LEFT_SCREEN_X + WIDTH + 2" :y="SCREEN_Y - 0.1" rx="0.1" width="1" height="2"></rect>
       <text class="pass" :y="SCREEN_Y + 0.5">
         <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5">P</tspan>
@@ -264,14 +260,8 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5" dy="0.35">s</tspan>
       </text>
     </g>
-    <g @mousedown.stop>
-      <PlayingButton
-        :class="{ active: canRequeue }"
-        @click.stop="requeue"
-        :x="CONTROLS_X"
-        :y="CONTROLS_Y"
-        text="Requeue"
-      />
+    <g @mousedown.stop :transform="`translate(${CONTROLS_X}, ${CONTROLS_Y})`">
+      <slot></slot>
     </g>
   </svg>
 </template>
