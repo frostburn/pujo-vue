@@ -13,7 +13,6 @@ import {
   GHOST_Y
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
-import { getVersionInfo } from '@/util'
 import { chainFX } from '@/soundFX'
 
 // === Type definitions ===
@@ -111,7 +110,6 @@ function onMessage(message: any) {
     replay.screenSeed = message.screenSeed
     replay.moves.length = 0
     replay.metadata = message.metadata
-    replay.metadata.client = getVersionInfo()
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameFrameRate.value = 45 / 1000
@@ -157,6 +155,7 @@ function onMessage(message: any) {
   if (message.type === 'game result') {
     replay.gameSeed = message.gameSeed
     replay.result.reason = message.reason
+    replay.metadata.endTime = message.msSince1970
     if (message.result === 'win') {
       replay.result.winner = 0
       wins[0]++

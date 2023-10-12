@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getClientInfo } from '@/util'
 
 type OpenListener = () => void
 type MessageListener = (message: any) => void
@@ -48,23 +49,29 @@ export const useWebSocketStore = defineStore('websocket', () => {
     return false
   }
 
+  function sendGameReques(socket: WebSocket) {
+    socket.send(
+      JSON.stringify({
+        type: 'game request',
+        name: localStorage.getItem('name') || undefined,
+        clientInfo: getClientInfo()
+      })
+    )
+  }
+
   function requestGame() {
     if (guard()) {
       // eslint-disable-next-line no-inner-declarations
       function requestOnOpen() {
         const socket = webSocket.value!
-        socket.send(
-          JSON.stringify({ type: 'game request', name: localStorage.getItem('name') || undefined })
-        )
+        sendGameReques(socket)
         removeOpenListener(requestOnOpen)
       }
       addOpenListener(requestOnOpen)
       return
     }
     const socket = webSocket.value!
-    socket.send(
-      JSON.stringify({ type: 'game request', name: localStorage.getItem('name') || undefined })
-    )
+    sendGameReques(socket)
   }
 
   function requestState() {

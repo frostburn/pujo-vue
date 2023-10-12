@@ -179,7 +179,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
 </script>
 
 <template>
-  <svg ref="svg" width="100%" height="100%" viewBox="0 0 20 15" xmlns="http://www.w3.org/2000/svg">
+  <svg ref="svg" width="100%" height="100%" viewBox="0 0 21 15" xmlns="http://www.w3.org/2000/svg">
     <SVGDefs />
     <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
       <PlayingScreen

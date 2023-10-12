@@ -1,5 +1,5 @@
-import { BLUE, GREEN, PURPLE, RED, YELLOW } from 'pujo-puyo-core'
-import { version } from '../package.json'
+import { BLUE, GREEN, PURPLE, RED, YELLOW, type ApplicationInfo } from 'pujo-puyo-core'
+import { name, version } from '../package.json'
 import { packages } from '../package-lock.json'
 
 declare const __COMMIT_HASH__: string
@@ -127,9 +127,10 @@ export function panelSymbol(color: number, jiggle = false) {
   return ''
 }
 
-export function getVersionInfo() {
+export function getClientInfo(): ApplicationInfo {
   const core = packages['node_modules/pujo-puyo-core']
   return {
+    name,
     version,
     resolved: __COMMIT_HASH__,
     core: {
