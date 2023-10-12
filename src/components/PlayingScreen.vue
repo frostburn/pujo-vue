@@ -27,6 +27,7 @@ const props = defineProps<{
   preIgnitions: boolean[] | null
   chainCards: Chain[]
   wins: number
+  showHand: boolean
 }>()
 
 const ghostAttrs = computed(() => {
@@ -183,6 +184,18 @@ const previewStrokes = computed(() => previewAttrs((i) => getStroke(i), MISSING_
 const previewSymbols = computed(() => previewAttrs((i) => panelSymbol(i), MISSING_SYMBOL))
 
 const score = computed(() => (props.gameState ? props.gameState.score.toString() : '-'))
+
+const handFills = computed(() =>
+  props.gameState && props.showHand ? props.gameState.hand.map((i) => getFill(i)) : []
+)
+
+const handStrokes = computed(() =>
+  props.gameState && props.showHand ? props.gameState.hand.map((i) => getStroke(i)) : []
+)
+
+const handSymbols = computed(() =>
+  props.gameState && props.showHand ? props.gameState.hand.map((i) => panelSymbol(i)) : []
+)
 </script>
 
 <template>
@@ -216,6 +229,57 @@ const score = computed(() => (props.gameState ? props.gameState.score.toString()
   <use v-if="gameState && gameState.lockedOut" href="#game-over"></use>
   <!--Garbage queue-->
   <use v-for="(attrs, i) in garbageGlyphs" :key="i" v-bind="attrs" :x="i + 0.5" y="-1"></use>
+
+  <!--Hand preview-->
+  <g v-for="(fill, i) of handFills" :key="i">
+    <use
+      href="#panel0"
+      y="0"
+      :x="2.5 + i"
+      :fill="fill"
+      :stroke="handStrokes[i]"
+      :stroke-width="STROKE_WIDTH"
+      opacity="0.6"
+    >
+      <animate
+        v-if="i"
+        attributeName="y"
+        values="-0.05;0.05;-0.05"
+        dur="2s"
+        repeatCount="indefinite"
+      ></animate>
+      <animate
+        v-else
+        attributeName="y"
+        values="0.05;-0.05;0.05"
+        dur="2s"
+        repeatCount="indefinite"
+      ></animate>
+    </use>
+    <use
+      y="0"
+      :x="2.5 + i"
+      :href="handSymbols[i]"
+      :fill="handStrokes[i]"
+      stroke="none"
+      opacity="0.9"
+    >
+      <animate
+        v-if="i"
+        attributeName="y"
+        values="-0.05;0.05;-0.05"
+        dur="2s"
+        repeatCount="indefinite"
+      ></animate>
+      <animate
+        v-else
+        attributeName="y"
+        values="0.05;-0.05;0.05"
+        dur="2s"
+        repeatCount="indefinite"
+      ></animate>
+    </use>
+  </g>
 
   <!--Piece preview-->
   <g :stroke-width="STROKE_WIDTH">

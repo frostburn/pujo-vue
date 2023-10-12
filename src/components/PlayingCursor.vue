@@ -3,7 +3,7 @@ import { GHOST_Y, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue'
 
 // Please note that orbit distances less than 0.5 would need updates to the second panel during cursor movement.
-const MIN_ORBIT_DISTANCE = 0.5
+const MIN_ORBIT_DISTANCE = 0.6
 const MAX_ORBIT_DISTANCE = 7
 
 type Coords = {

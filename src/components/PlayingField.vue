@@ -188,6 +188,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :preIgnitions="preIgnitions"
         :chainCards="chainCards[0]"
         :wins="wins[0]"
+        :showHand="false"
       />
     </g>
     <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
@@ -197,6 +198,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :preIgnitions="null"
         :chainCards="chainCards[1]"
         :wins="wins[1]"
+        :showHand="true"
       />
     </g>
     <!--Opponent thinking indicator-->

@@ -77,7 +77,7 @@ const replay: Replay = {
 }
 const passing = ref(false)
 const justPassed = ref(false)
-const canRequeue = ref(false)
+const canRequeue = ref(true)
 const wins = reactive([0, 0])
 let tickId: number | null = null
 let referenceAge = 0
@@ -135,17 +135,14 @@ function onMessage(message: any) {
   if (message.type === 'bag') {
     message.player = identity ? 1 - message.player : message.player
     bagQueues[message.player].push(message.bag)
-    if (!game!.games[message.player].bag.length) {
+    if (game!.games[message.player].bag.length < 6) {
       game!.games[message.player].bag = [...message.bag]
+      if (LOG) {
+        console.log(`Setting bag of ${message.player} from message`)
+      }
     }
     if (message.player === 1) {
       opponentBagTime = performance.now()
-    }
-    if (message.player === 0 && game!.games[0].bag.length < 6) {
-      if (LOG) {
-        console.log('Setting own bag from message')
-      }
-      game!.games[0].bag = [...message.bag]
     }
   }
   if (message.type === 'move') {
@@ -202,9 +199,9 @@ function tick() {
         lastAgeDrawn = -1
         replay.moves.push(playedMove)
 
-        if (i === 0 && game.games[i].bag.length < 6 && bagQueues[i].length) {
+        if (game.games[i].bag.length < 6 && bagQueues[i].length) {
           if (LOG) {
-            console.log('Setting own bag from queue')
+            console.log(`Setting bag of ${i} from queue`)
           }
           game.games[i].bag = [...bagQueues[i][0]]
         }
@@ -376,6 +373,7 @@ const preIgnitions = computed(() => {
 onMounted(() => {
   websocket.addMessageListener(onMessage)
   websocket.requestGame()
+  canRequeue.value = false
   frameId = window.requestAnimationFrame(draw)
 })
 

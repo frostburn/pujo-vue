@@ -15,6 +15,8 @@ import { ChainDeck } from '@/chain-deck'
 
 // TODO: SoundFX
 
+// TODO: Store game type in replay and show hands for realtime
+
 // In frames per millisecond.
 const NOMINAL_FRAME_RATE = 30 / 1000
 
@@ -152,6 +154,7 @@ onUnmounted(() => {
             :preIgnitions="null"
             :chainCards="chainCards[0]"
             :wins="gameStates && gameStates[1].lockedOut ? 1 : 0"
+            :showHand="false"
           />
         </g>
         <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
@@ -161,6 +164,7 @@ onUnmounted(() => {
             :preIgnitions="null"
             :chainCards="chainCards[1]"
             :wins="gameStates && gameStates[0].lockedOut ? 1 : 0"
+            :showHand="false"
           />
         </g>
       </svg>
