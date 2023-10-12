@@ -79,6 +79,7 @@ const passing = ref(false)
 const justPassed = ref(false)
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
+const timeouts = reactive([false, false])
 let tickId: number | null = null
 let referenceAge = 0
 let referenceTime: DOMHighResTimeStamp | null = null
@@ -101,11 +102,9 @@ function onMessage(message: any) {
   if (LOG) {
     console.log(message)
   }
-  if (message.type === 'identity') {
-    identity = message.player
-  }
   if (message.type === 'game params') {
     game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    identity = message.identity
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
     replay.moves.length = 0
@@ -125,6 +124,7 @@ function onMessage(message: any) {
     passing.value = false
     justPassed.value = false
     canRequeue.value = false
+    timeouts.fill(false)
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
     } else {
@@ -137,6 +137,7 @@ function onMessage(message: any) {
     bagQueues[message.player].push(message.bag)
     if (game!.games[message.player].bag.length < 6) {
       game!.games[message.player].bag = [...message.bag]
+      lastAgeDrawn = -1
       if (LOG) {
         console.log(`Setting bag of ${message.player} from message`)
       }
@@ -161,6 +162,15 @@ function onMessage(message: any) {
       wins[1]++
     }
     localStorage.setItem('replays.latest', JSON.stringify(replay))
+    if (message.reason === 'timeout') {
+      if (replay.result.winner === 0) {
+        timeouts[1] = true
+      } else if (replay.result.winner === 1) {
+        timeouts[0] = true
+      } else {
+        timeouts.fill(true)
+      }
+    }
     canRequeue.value = true
     gameFrameRate.value = 30 / 1000
     gameType.value = 'realtime'
@@ -204,6 +214,7 @@ function tick() {
             console.log(`Setting bag of ${i} from queue`)
           }
           game.games[i].bag = [...bagQueues[i][0]]
+          lastAgeDrawn = -1
         }
       }
     }
@@ -272,9 +283,17 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   const waitingOnSelf = gameStates.value && !gameStates.value[0].busy
   const opponentResolving = gameStates.value && gameStates.value[1].busy
   const gameOver = gameStates.value && gameStates.value.some((s) => s.lockedOut)
+  const realtime = gameType.value === 'realtime'
 
   // XXX: Fading depends on framerate
-  if (opponentBagTime === null || moveReceived || waitingOnSelf || opponentResolving || gameOver) {
+  if (
+    opponentBagTime === null ||
+    moveReceived ||
+    waitingOnSelf ||
+    opponentResolving ||
+    gameOver ||
+    realtime
+  ) {
     opponentThinkingOpacity.value *= 0.7
   } else if (drawTime - opponentBagTime > 1000) {
     opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
@@ -407,6 +426,7 @@ onUnmounted(() => {
       :primaryDropletY="primaryDropletY"
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"
+      :timeouts="timeouts"
     />
   </main>
 </template>

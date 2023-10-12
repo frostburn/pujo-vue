@@ -316,9 +316,32 @@ const trophyD = transformPath(
           <textPath href="#game-path" textLenght="20%">Game</textPath>
         </text>
         <text class="game-over">
-          <textPath href="#over-path" textLength="17%">Over</textPath>
+          <textPath href="#over-path" textLength="16%">Over</textPath>
         </text>
       </g>
+      <!--Timeout indicator-->
+      <g id="timeout">
+        <ellipse
+          cx="3"
+          cy="8.2"
+          rx="2.6"
+          ry="1.7"
+          fill="rgba(10, 20, 50, 0.6)"
+          stroke="rgba(10, 20, 50, 0.7)"
+          stroke-width="0.1"
+        ></ellipse>
+        <path
+          id="timeout-path"
+          d="M 1 8.5 q 2 0.2 4 0"
+          fill="none"
+          stroke="green"
+          stroke-width="0.2"
+        ></path>
+        <text class="timeout">
+          <textPath href="#timeout-path">Timeout</textPath>
+        </text>
+      </g>
+      <!--Opponent thinking indicator-->
       <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur in="SourceGraphic" stdDeviation="0.06"></feGaussianBlur>
       </filter>
@@ -371,8 +394,6 @@ const trophyD = transformPath(
   fill: aliceblue;
   stroke: cornflowerblue;
   stroke-width: 0.035px;
-  stroke-linejoin: round;
-  stroke-linecap: round;
 }
 .game-over {
   font:
@@ -381,8 +402,14 @@ const trophyD = transformPath(
   fill: red;
   stroke: yellow;
   stroke-width: 0.035px;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+}
+.timeout {
+  font:
+    bold 1.05px 'Arial',
+    sans-serif;
+  fill: #8fa;
+  stroke: #246;
+  stroke-width: 0.03px;
 }
 .waiting {
   font:

@@ -32,6 +32,7 @@ const props = defineProps<{
   primaryDropletY: number
   secondaryDropletY: number
   preIgnitions: boolean[]
+  timeouts: boolean[]
 }>()
 
 const emit = defineEmits(['pass', 'commit', 'requeue'])
@@ -189,6 +190,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :chainCards="chainCards[0]"
         :wins="wins[0]"
         :showHand="false"
+        :timeout="timeouts[0]"
       />
     </g>
     <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
@@ -199,6 +201,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :chainCards="chainCards[1]"
         :wins="wins[1]"
         :showHand="true"
+        :timeout="timeouts[1]"
       />
     </g>
     <!--Opponent thinking indicator-->

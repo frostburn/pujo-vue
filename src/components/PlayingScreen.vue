@@ -28,6 +28,7 @@ const props = defineProps<{
   chainCards: Chain[]
   wins: number
   showHand: boolean
+  timeout: boolean
 }>()
 
 const ghostAttrs = computed(() => {
@@ -227,6 +228,8 @@ const handSymbols = computed(() =>
   />
   <!--Game Over indicator-->
   <use v-if="gameState && gameState.lockedOut" href="#game-over"></use>
+  <!--Timout indicator-->
+  <use v-if="timeout" href="#timeout"></use>
   <!--Garbage queue-->
   <use v-for="(attrs, i) in garbageGlyphs" :key="i" v-bind="attrs" :x="i + 0.5" y="-1"></use>
 

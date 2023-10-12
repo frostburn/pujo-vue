@@ -6,7 +6,7 @@ import {
   type GameState,
   type TickResult
 } from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
 import PlayingScreen from '@/components/PlayingScreen.vue'
 import ReplayTrack from '@/components/ReplayTrack.vue'
@@ -51,6 +51,7 @@ let referenceTime = 0
 
 const time = ref(0)
 const frameRate = ref(0)
+const timeouts = reactive([false, false])
 
 const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
   if (time.value < 0) {
@@ -121,6 +122,18 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   const intendedAge = (timeStamp - referenceTimeStamp) * frameRate.value
   time.value = Math.max(0, Math.min(finalTime, referenceTime + intendedAge))
 
+  if (time.value === finalTime && replay.result.reason === 'timeout') {
+    if (replay.result.winner === 0) {
+      timeouts[1] = true
+    } else if (replay.result.winner === 1) {
+      timeouts[0] = true
+    } else {
+      timeouts.fill(true)
+    }
+  } else {
+    timeouts.fill(false)
+  }
+
   drawId = requestAnimationFrame(draw)
 }
 
@@ -155,6 +168,7 @@ onUnmounted(() => {
             :chainCards="chainCards[0]"
             :wins="gameStates && gameStates[1].lockedOut ? 1 : 0"
             :showHand="false"
+            :timeout="timeouts[0]"
           />
         </g>
         <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
@@ -165,6 +179,7 @@ onUnmounted(() => {
             :chainCards="chainCards[1]"
             :wins="gameStates && gameStates[0].lockedOut ? 1 : 0"
             :showHand="false"
+            :timeout="timeouts[1]"
           />
         </g>
       </svg>
