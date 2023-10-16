@@ -444,8 +444,8 @@ const trophyD = transformPath(
 .control {
   fill: #444;
   stroke: #333;
-  cursor: not-allowed;
   stroke-width: 0.11;
+  cursor: pointer;
 }
 .control text {
   fill: #221;
@@ -458,9 +458,11 @@ const trophyD = transformPath(
 .control.active {
   fill: burlywood;
   stroke: sienna;
-  cursor: pointer;
 }
 .control.active text {
   fill: #110;
+}
+.control.disabled {
+  cursor: not-allowed;
 }
 </style>

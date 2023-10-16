@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('../views/OnlineView.vue')
     },
     {
+      path: '/play-cpu',
+      name: 'play-cpu',
+      component: () => import('../views/LocalView.vue')
+    },
+    {
       path: '/replay',
       name: 'replay',
       component: () => import('../views/ReplayView.vue')

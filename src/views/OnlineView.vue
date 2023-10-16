@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useWebSocketStore } from '@/stores/websocket'
-import PlayingField from '../components/PlayingField.vue'
+import PlayingField from '@/components/PlayingField.vue'
+import PlayingButton from '@/components/PlayingButton.vue'
 import { useAudioContextStore } from '@/stores/audio-context'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import {
@@ -324,6 +325,7 @@ function pass() {
 
 function requeue() {
   if (canRequeue.value) {
+    localStorage.setItem('replays.latest', JSON.stringify(replay))
     websocket.requestGame()
   }
 }
@@ -412,13 +414,11 @@ onUnmounted(() => {
     <PlayingField
       ref="playingField"
       @pass="pass"
-      @requeue="requeue"
       @commit="commitMove"
       :wins="wins"
       :gameStates="gameStates"
       :chainCards="chainCards"
       :canPass="canPass"
-      :canRequeue="canRequeue"
       :passing="passing"
       :opponentThinkingOpacity="opponentThinkingOpacity"
       :fallMu="fallMu"
@@ -427,6 +427,14 @@ onUnmounted(() => {
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"
       :timeouts="timeouts"
-    />
+    >
+      <PlayingButton
+        :class="{ active: canRequeue, disabled: !canRequeue }"
+        @click.stop="requeue"
+        text="Requeue"
+        :x="0"
+        :y="0"
+      />
+    </PlayingField>
   </main>
 </template>
