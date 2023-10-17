@@ -9,10 +9,10 @@ import {
   type GameState,
   MultiplayerGame,
   type Replay,
-  JKISS32,
   VISIBLE_HEIGHT,
   GHOST_Y,
-  FischerTimer
+  FischerTimer,
+  OnePlayerGame
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -110,6 +110,7 @@ function onMessage(message: any) {
   if (message.type === 'game params') {
     game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
     identity = message.identity as number
+    replay.gameSeed = -1
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
     replay.moves.length = 0
@@ -197,7 +198,19 @@ function onMessage(message: any) {
     referenceAge = 0
     if (game) {
       // This is basically brain surgery just to keep playing
-      game.games[0].jkiss = new JKISS32()
+      const surrogate = new OnePlayerGame(replay.gameSeed, replay.colorSelection, replay.screenSeed)
+      for (const move of replay.moves) {
+        if (move.player === 0) {
+          surrogate.advanceColors()
+        }
+      }
+      game.games[0].bag = surrogate.bag
+      game.games[0].jkiss = surrogate.jkiss
+    }
+    for (const timer of timers) {
+      if (timer.reference !== null) {
+        timer.end()
+      }
     }
   }
 }
@@ -300,6 +313,10 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     timeDisplays[i] = timers[i].display()
   }
 
+  if (gameType.value === 'pausing' && timers[0].flagged()) {
+    websocket.timeout()
+  }
+
   frameId = window.requestAnimationFrame(draw)
 }
 
@@ -335,12 +352,13 @@ function commitMove(x1: number, y1: number, orientation: number) {
     if (timers[0].end()) {
       websocket.timeout()
     } else {
-      websocket.makeMove(x1, y1, orientation)
+      websocket.makeMove(x1, y1, orientation, timers[0].remaining)
       moveSent = true
     }
   } else if (game) {
     const playedMove = game.play(0, x1, y1, orientation)
     replay.moves.push(playedMove)
+    localStorage.setItem('replays.latest', JSON.stringify(replay))
   }
   justPassed.value = false
 }
@@ -404,6 +422,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   websocket.removeMessageListener(onMessage)
+  websocket.resign()
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }

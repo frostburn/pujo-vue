@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getClientInfo } from '@/util'
+import type { ReplayResultReason } from 'pujo-puyo-core'
 
 type OpenListener = () => void
 type MessageListener = (message: any) => void
@@ -82,12 +83,18 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.send(JSON.stringify({ type: 'simple state request' }))
   }
 
-  function makeMove(x1: number, y1: number, orientation: number, hardDrop = false) {
+  function makeMove(
+    x1: number,
+    y1: number,
+    orientation: number,
+    msRemaining: number,
+    hardDrop = false
+  ) {
     if (guard()) {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, hardDrop }))
+    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, msRemaining, hardDrop }))
   }
 
   function passMove() {
@@ -103,7 +110,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'result', reason: 'timeout' }))
+    const reason: ReplayResultReason = 'timeout'
+    socket.send(JSON.stringify({ type: 'result', reason }))
+  }
+
+  function resign() {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    const reason: ReplayResultReason = 'resignation'
+    socket.send(JSON.stringify({ type: 'result', reason }))
   }
 
   function addOpenListener(listener: OpenListener) {
@@ -130,6 +147,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     makeMove,
     passMove,
     timeout,
+    resign,
     addOpenListener,
     removeOpenListener,
     addMessageListener,
