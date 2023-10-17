@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import TheButton from '../components/TheButton.vue'
+import SVGDefs from '@/components/SVGDefs.vue'
 </script>
 
 <template>
-  <div class="about">
-    <h1>This is an about page</h1>
-    <div class="content">
-      <TheButton />
-    </div>
-  </div>
+  <main>
+    <svg width="600px" height="300px" xmlns="http://www.w3.org/2000/svg" viewBox="-0.1 -0.1 7 2.5">
+      <SVGDefs />
+      <use href="#full-logo"></use>
+    </svg>
+    <h2>Developed by Lumi Pakkanen (frostburn)</h2>
+    <p>
+      Report bugs and request features at
+      <a href="https://github.com/frostburn/pujo-vue/issues">github.com/frostburn/pujo-vue</a>
+    </p>
+  </main>
 </template>
 
-<style>
-@media (min-width: 1024px) {
-  .about {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    flex-flow: row wrap;
-  }
-  .about > * {
-    padding: 10px;
-    flex: 1 100%;
-  }
+<style scoped>
+svg {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 100px;
+}
+main {
+  text-align: center;
 }
 </style>

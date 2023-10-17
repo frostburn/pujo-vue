@@ -41,6 +41,9 @@ function tokenizePath(d: string): string[] {
       token += character
     }
   }
+  if (token) {
+    result.push(token)
+  }
   return result
 }
 

@@ -165,6 +165,28 @@ const trophyD = transformPath(
     'Z',
   0.35
 )
+
+// Branding
+const crescentD = transformPath('M 0 0 A 1 1 0 1 1 0.9 0.8 A 0.8 0.8 0 1 0 0 0 z', 0.95, 0.05, 1.2)
+const leafBodyD = transformPath(
+  'M 95.475041,101.30591 C 80.828481,79.440826 71.382451,88.591836 56.704531,86.004596 ' +
+    'c 2.92477,-1.03198 4.7018,-2.47636 6.31563,-2.95284 -1.426,-4.29393 -2.62952,-1.8623 -5.54008,-2.02377 1.26036,-2.70646 -3.24566,-1.33314 ' +
+    '-6.11568,-0.99976 3.06824,-4.89796 6.92345,-2.27433 9.08064,-4.34038 -7.73865,-3.08276 -18.86406,-8.03653 -19.41956,-11.43155 1.98947,-0.002 ' +
+    '2.62155,0.93495 4.39894,0.79981 -1.89868,-4.02329 -6.59425,-4.16468 -7.92738,-7.15182 0.85838,-0.1594 1.36744,-0.27273 2.03591,-0.55342 ' +
+    '-1.02818,-1.76526 -3.7121,-1.00564 -3.49413,-4.62106 3.04571,1.05035 8.11103,5.73378 10.78526,4.71601 0.55342,-0.80569 -0.0645,-1.02402 ' +
+    '-0.45847,-1.49253 2.85789,-1.8117 3.28758,8.10686 15.05493,10.70244 -1.52303,-3.48409 -2.79516,-1.72263 -3.83338,-7.85669 11.75731,2.49057 ' +
+    '11.67966,5.3176 17.43009,12.25562 -2.37932,-5.43335 -0.45222,-3.62927 -2.04595,-7.24469 4.698,1.40382 15.45276,11.03961 14.63077,16.50103 ' +
+    '3.7731,2.13882 9.32287,9.82569 9.12709,16.0547 0.36976,1.56321 0.7383,2.840194 -1.25412,4.940214 z',
+  0.029,
+  -0.99,
+  -1.2
+)
+const leafVeinDs = [
+  'm 96,98.328566 c -10.25056,-15.90605 -47.2233,-37.04343 -55.91861,-41.85059',
+  'm 76.130461,73.090966 c 5.08994,4.52439 9.04878,13.85593 9.04878,13.85593',
+  'm 61.638281,62.274846 c 6.78658,6.99867 9.19016,13.50248 9.19016,13.50248',
+  'm 61.214111,78.534376 c 7.42283,0 16.47161,2.47427 16.47161,2.47427'
+].map((d) => transformPath(d, 0.029, -0.99, -1.2))
 </script>
 
 <template>
@@ -382,6 +404,41 @@ const trophyD = transformPath(
 
       <!--Win indicator-->
       <path id="trophy" :d="trophyD" fill="gold" stroke="goldenrod" stroke-width="0.04"></path>
+
+      <!--Branding-->
+      <g id="logo">
+        <path :d="crescentD" fill="goldenrod"></path>
+        <path :d="leafBodyD" fill="green"></path>
+        <path
+          v-for="(d, i) of leafVeinDs"
+          :key="i"
+          :d="d"
+          fill="none"
+          stroke="darkgreen"
+          stroke-width="0.04"
+        ></path>
+      </g>
+      <g id="plain-logo">
+        <path :d="crescentD"></path>
+        <path :d="leafBodyD"></path>
+      </g>
+      <filter id="halo">
+        <feGaussianBlur in="sourceGraphic" stdDeviation="0.05"></feGaussianBlur>
+      </filter>
+      <g id="full-logo">
+        <g fill="white" filter="url(#halo)" opacity="0.5">
+          <rect x="0" y="1.4" width="3.8" height="0.05"></rect>
+          <text x="0" y="1.3" class="artemisia-title">Artemisia</text>
+          <text x="0" y="1.92" class="artemisia-subtitle">a.k.a. Pujo Puyo</text>
+          <use href="#plain-logo" x="4.55"></use>
+        </g>
+        <g fill="#887">
+          <rect x="0" y="1.4" width="3.8" height="0.05"></rect>
+          <text x="0" y="1.3" class="artemisia-title">Artemisia</text>
+          <text x="0" y="1.92" class="artemisia-subtitle">a.k.a. Pujo Puyo</text>
+        </g>
+        <use href="#logo" x="4.55"></use>
+      </g>
     </defs>
   </svg>
 </template>
@@ -464,5 +521,13 @@ const trophyD = transformPath(
 }
 .control.disabled {
   cursor: not-allowed;
+}
+.artemisia-title {
+  font:
+    1.5px 'Italianno',
+    cursive;
+}
+.artemisia-subtitle {
+  font: italic 0.5px serif;
 }
 </style>
