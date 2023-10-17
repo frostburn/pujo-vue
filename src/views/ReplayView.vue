@@ -34,13 +34,15 @@ let game = new MultiplayerGame(replay.gameSeed, replay.colorSelection, replay.sc
 let deck = new ChainDeck()
 let replayIndex = 0
 
+const tempDeck = new ChainDeck()
+
 function takeSnapshot(g: MultiplayerGame, tickResults: TickResult[]) {
   if (!(g.age % SNAPSHOT_INTERVAL)) {
     snapshots.push(g.clone(true))
-    snapDecks.push(deck.clone())
+    snapDecks.push(tempDeck.clone())
   }
   if (tickResults.length) {
-    deck.processTick(g, tickResults)
+    tempDeck.processTick(g, tickResults)
   }
 }
 
