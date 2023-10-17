@@ -12,8 +12,8 @@ import PlayingScreen from '@/components/PlayingScreen.vue'
 import ReplayTrack from '@/components/ReplayTrack.vue'
 import { LEFT_SCREEN_X, RIGHT_SCREEN_X, SCREEN_Y } from '@/util'
 import { ChainDeck } from '@/chain-deck'
-
-// TODO: SoundFX
+import { processTickSounds } from '@/soundFX'
+import { useAudioContextStore } from '@/stores/audio-context'
 
 // TODO: Store game type in replay and show hands for realtime
 // TODO: Always show hands at the end
@@ -22,6 +22,8 @@ import { ChainDeck } from '@/chain-deck'
 const NOMINAL_FRAME_RATE = 30 / 1000
 
 const SNAPSHOT_INTERVAL = 30
+
+const audioContext = useAudioContextStore()
 
 const replay: Replay = JSON.parse(localStorage.getItem('replays.latest')!)
 
@@ -54,7 +56,7 @@ const time = ref(0)
 const frameRate = ref(0)
 const timeouts = reactive([false, false])
 
-const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
+const gameAndDeckStates = computed<[GameState[], TickResult[] | null, ChainDeck]>(() => {
   if (time.value < 0) {
     throw new Error('Negative times not supported')
   }
@@ -73,20 +75,24 @@ const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
       replayIndex++
     }
   }
+
+  let tickResults: TickResult[] | null = null
+
   // Fast-forward to the current time
   while (game.age < time.value) {
     while (replay.moves[replayIndex]?.time === game.age) {
       const move = replay.moves[replayIndex++]
       game.play(move.player, move.x1, move.y1, move.orientation)
     }
-    const tickResults = game.tick()
+    tickResults = game.tick()
     deck.processTick(game, tickResults)
   }
-  return [game.state, deck]
+  return [game.state, tickResults, deck]
 })
 
 const gameStates = computed(() => gameAndDeckStates.value[0])
-const chainCards = computed(() => gameAndDeckStates.value[1].chains)
+const tickResults = computed(() => gameAndDeckStates.value[1])
+const chainCards = computed(() => gameAndDeckStates.value[2].chains)
 
 const fallMu = computed(() => time.value - Math.floor(time.value))
 
@@ -122,6 +128,10 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   }
   const intendedAge = (timeStamp - referenceTimeStamp) * frameRate.value
   time.value = Math.max(0, Math.min(finalTime, referenceTime + intendedAge))
+
+  if (frameRate.value > 0 && tickResults.value) {
+    processTickSounds(audioContext, tickResults.value)
+  }
 
   if (time.value === finalTime && replay.result.reason === 'timeout') {
     if (replay.result.winner === 0) {
@@ -168,7 +178,7 @@ onUnmounted(() => {
             :preIgnitions="null"
             :chainCards="chainCards[0]"
             :wins="gameStates && gameStates[1].lockedOut ? 1 : 0"
-            :showHand="false"
+            :showHand="time >= finalTime"
             :timeout="timeouts[0]"
           />
         </g>
@@ -179,7 +189,7 @@ onUnmounted(() => {
             :preIgnitions="null"
             :chainCards="chainCards[1]"
             :wins="gameStates && gameStates[0].lockedOut ? 1 : 0"
-            :showHand="false"
+            :showHand="time >= finalTime"
             :timeout="timeouts[1]"
           />
         </g>

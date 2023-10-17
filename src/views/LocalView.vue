@@ -15,8 +15,8 @@ import {
   WIDTH
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-
-// TODO: SoundFX
+import { useAudioContextStore } from '@/stores/audio-context'
+import { processTickSounds } from '@/soundFX'
 
 // This import is broken in production mode
 // import AIWorkerUrl from "../ai-worker.ts?url"
@@ -74,6 +74,8 @@ const DIFFICULTIES = [
     anticipate: false // Needs the full bag so cannot jump ahead.
   } // We could cheat by true cloning, but where's the fun in that?
 ]
+
+const audioContext = useAudioContextStore()
 
 // -- State --
 
@@ -175,6 +177,7 @@ function tick() {
   while (referenceAge < intendedAge) {
     const tickResults = game.tick()
     chainDeck.processTick(game, tickResults)
+    processTickSounds(audioContext, tickResults)
 
     if (!gameOver.value && tickResults.some((t) => t.lockedOut)) {
       if (tickResults[0].lockedOut) {

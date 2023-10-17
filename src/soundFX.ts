@@ -1,3 +1,4 @@
+import type { TickResult } from 'pujo-puyo-core'
 import { useAudioContextStore } from './stores/audio-context'
 
 export function edArpeggio(notes: number[], divisions = 12, equave = 2, baseFrequency = 440) {
@@ -72,4 +73,33 @@ export function chainFX(
   const params: any = player ? { ...RIGHT_PARAMS } : { ...LEFT_PARAMS }
   params.frequencies = CHAIN_ARPEGGIO_FREQUENCIES[chainNumber - 1]
   context.arpeggiate(player, params)
+}
+
+export function processTickSounds(
+  context: ReturnType<typeof useAudioContextStore>,
+  tickResults: TickResult[]
+) {
+  let impactOffset = 0
+  let plopOffset = 0
+  for (let i = 0; i < tickResults.length; ++i) {
+    if (tickResults[i].didClear) {
+      chainFX(context, i, tickResults[i].chainNumber)
+    }
+    // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
+    if (
+      tickResults[i].coloredLanded ||
+      (tickResults[i].didJiggle && !tickResults[i].garbageLanded)
+    ) {
+      impactOffset += 1 + 2000 * i
+    }
+    if (tickResults[i].garbageLanded) {
+      plopOffset += 1 + 20 * i
+    }
+  }
+  if (impactOffset) {
+    context.impact(impactOffset)
+  }
+  if (plopOffset) {
+    context.plop(plopOffset)
+  }
 }

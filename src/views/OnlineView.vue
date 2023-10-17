@@ -14,7 +14,7 @@ import {
   GHOST_Y
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
-import { chainFX } from '@/soundFX'
+import { processTickSounds } from '@/soundFX'
 
 // === Type definitions ===
 
@@ -233,29 +233,7 @@ function tick() {
       if (tickResults.every((r) => !r.busy)) {
         passing.value = false
       }
-      let impactOffset = 0
-      let plopOffset = 0
-      for (let i = 0; i < tickResults.length; ++i) {
-        if (tickResults[i].didClear) {
-          chainFX(audioContext, i, tickResults[i].chainNumber)
-        }
-        // For technical reasons hard-dropped pieces only jiggle and never "land" as they have zero airtime.
-        if (
-          tickResults[i].coloredLanded ||
-          (tickResults[i].didJiggle && !tickResults[i].garbageLanded)
-        ) {
-          impactOffset += 1 + 2000 * i
-        }
-        if (tickResults[i].garbageLanded) {
-          plopOffset += 1 + 20 * i
-        }
-      }
-      if (impactOffset) {
-        audioContext.impact(impactOffset)
-      }
-      if (plopOffset) {
-        audioContext.plop(plopOffset)
-      }
+      processTickSounds(audioContext, tickResults)
     }
     referenceAge++
   }
