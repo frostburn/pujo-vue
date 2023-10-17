@@ -104,7 +104,7 @@ const replay: Replay = {
   moves: [],
   metadata: {
     event: 'Local Play vs. CPU',
-    names: [localStorage.getItem('name') || 'Anonymous', difficulty.value.botName],
+    names: [localStorage.getItem('name') || 'Anonymous', `${difficulty.value.label} (CPU)`],
     priorWins: [0, 0],
     site: 'https://pujo.lumipakkanen.com',
     round: 0,
@@ -321,7 +321,7 @@ function selectDifficulty(index: number) {
   } else {
     botActive.value = true
     difficultyIndex.value = index
-    replay.metadata.names[1] = difficulty.value.botName
+    replay.metadata.names[1] = `${difficulty.value.label} (CPU)`
   }
   replay.metadata.round = 0
   replay.metadata.priorWins = [0, 0]
