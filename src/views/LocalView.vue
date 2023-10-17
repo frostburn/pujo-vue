@@ -12,7 +12,8 @@ import {
   type StrategyResult,
   VISIBLE_HEIGHT,
   GHOST_Y,
-  WIDTH
+  WIDTH,
+  PASS
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAudioContextStore } from '@/stores/audio-context'
@@ -161,16 +162,18 @@ function tick() {
   }
 
   if (workerStrategy && !game.games[1].busy) {
-    const { x1, y1, orientation } = MOVES[workerStrategy.move]
-    const playedMove = game.play(1, x1, y1, orientation, difficulty.value.hardDrop)
-    lastAgeDrawn = -1
-    replay.moves.push(playedMove)
-    workerStrategy = null
+    if (workerStrategy.move !== PASS) {
+      const { x1, y1, orientation } = MOVES[workerStrategy.move]
+      const playedMove = game.play(1, x1, y1, orientation, difficulty.value.hardDrop)
+      lastAgeDrawn = -1
+      replay.moves.push(playedMove)
 
-    workerGame = game.clone()
-    for (let i = 0; i < workerAnticipation; ++i) {
-      workerGame.tick()
+      workerGame = game.clone()
+      for (let i = 0; i < workerAnticipation; ++i) {
+        workerGame.tick()
+      }
     }
+    workerStrategy = null
   }
 
   const intendedAge = (timeStamp - referenceTime) * FRAME_RATE
@@ -390,6 +393,8 @@ onUnmounted(() => {
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"
       :timeouts="[false, false]"
+      :names="[]"
+      :timeDisplays="[]"
     >
       <PlayingButton
         v-for="(diff, i) of DIFFICULTIES"

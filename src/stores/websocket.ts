@@ -49,7 +49,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     return false
   }
 
-  function sendGameReques(socket: WebSocket) {
+  function sendGameRequest(socket: WebSocket) {
     socket.send(
       JSON.stringify({
         type: 'game request',
@@ -64,14 +64,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
       // eslint-disable-next-line no-inner-declarations
       function requestOnOpen() {
         const socket = webSocket.value!
-        sendGameReques(socket)
+        sendGameRequest(socket)
         removeOpenListener(requestOnOpen)
       }
       addOpenListener(requestOnOpen)
       return
     }
     const socket = webSocket.value!
-    sendGameReques(socket)
+    sendGameRequest(socket)
   }
 
   function requestState() {
@@ -98,6 +98,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.send(JSON.stringify({ type: 'move', pass: true }))
   }
 
+  function timeout() {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.send(JSON.stringify({ type: 'result', reason: 'timeout' }))
+  }
+
   function addOpenListener(listener: OpenListener) {
     openListeners.add(listener)
   }
@@ -121,6 +129,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     requestState,
     makeMove,
     passMove,
+    timeout,
     addOpenListener,
     removeOpenListener,
     addMessageListener,

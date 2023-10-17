@@ -530,4 +530,9 @@ const leafVeinDs = [
 .artemisia-subtitle {
   font: italic 0.5px serif;
 }
+.name {
+  fill: lightgray;
+  font-size: 0.5px;
+  font-family: serif;
+}
 </style>

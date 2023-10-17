@@ -31,6 +31,8 @@ const props = defineProps<{
   secondaryDropletY: number
   preIgnitions: boolean[]
   timeouts: boolean[]
+  names: string[]
+  timeDisplays: string[]
 }>()
 
 const emit = defineEmits(['pass', 'commit'])
@@ -171,7 +173,13 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
 </script>
 
 <template>
-  <svg ref="svg" width="100%" height="100%" viewBox="0 0 21 15" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    ref="svg"
+    width="100%"
+    height="100%"
+    viewBox="0 0 21 16.5"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <SVGDefs />
     <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
       <PlayingScreen
@@ -202,6 +210,41 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
       :y="SCREEN_Y + 8"
       :opacity="opponentThinkingOpacity"
     ></use>
+    <!--Names-->
+    <template v-if="names.length">
+      <clipPath id="left-name-clip">
+        <rect :x="LEFT_SCREEN_X" :y="SCREEN_Y + VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+      </clipPath>
+      <text
+        class="name"
+        :x="LEFT_SCREEN_X"
+        :y="SCREEN_Y + VISIBLE_HEIGHT + 2"
+        clip-path="url(#left-name-clip)"
+      >
+        {{ names[0] }}
+      </text>
+
+      <clipPath id="right-name-clip">
+        <rect :x="RIGHT_SCREEN_X" :y="SCREEN_Y + VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+      </clipPath>
+      <text
+        class="name"
+        :x="RIGHT_SCREEN_X"
+        :y="SCREEN_Y + VISIBLE_HEIGHT + 2"
+        clip-path="url(#right-name-clip)"
+      >
+        {{ names[1] }}
+      </text>
+    </template>
+    <!--Timers-->
+    <template v-if="timeDisplays.length">
+      <text class="score" :x="LEFT_SCREEN_X + WIDTH + 0.5" :y="SCREEN_Y + VISIBLE_HEIGHT + 2">
+        {{ timeDisplays[0] }}
+      </text>
+      <text class="score" :x="RIGHT_SCREEN_X + WIDTH + 0.5" :y="SCREEN_Y + VISIBLE_HEIGHT + 2">
+        {{ timeDisplays[1] }}
+      </text>
+    </template>
     <g
       ref="cursorContainer"
       :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`"

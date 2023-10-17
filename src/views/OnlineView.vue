@@ -11,7 +11,8 @@ import {
   type Replay,
   JKISS32,
   VISIBLE_HEIGHT,
-  GHOST_Y
+  GHOST_Y,
+  FischerTimer
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -76,11 +77,14 @@ const replay: Replay = {
     reason: 'ongoing'
   }
 }
+let timers = [new FischerTimer(), new FischerTimer()]
 const passing = ref(false)
 const justPassed = ref(false)
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
 const timeouts = reactive([false, false])
+const names = reactive(['', ''])
+const timeDisplays = reactive(['0:00', '0:00'])
 let tickId: number | null = null
 let referenceAge = 0
 let referenceTime: DOMHighResTimeStamp | null = null
@@ -105,11 +109,16 @@ function onMessage(message: any) {
   }
   if (message.type === 'game params') {
     game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
-    identity = message.identity
+    identity = message.identity as number
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
     replay.moves.length = 0
     replay.metadata = message.metadata
+    names[0] = message.metadata.names[identity]
+    names[1] = message.metadata.names[1 - identity]
+    replay.metadata.names = [...names]
+    timers[0] = FischerTimer.fromString(message.metadata.timeControl)
+    timers[1] = FischerTimer.fromString(message.metadata.timeControl)
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameFrameRate.value = 45 / 1000
@@ -135,6 +144,7 @@ function onMessage(message: any) {
   }
   if (message.type === 'bag') {
     message.player = identity ? 1 - message.player : message.player
+    timers[message.player].begin()
     bagQueues[message.player].push(message.bag)
     if (game!.games[message.player].bag.length < 6) {
       game!.games[message.player].bag = [...message.bag]
@@ -147,8 +157,16 @@ function onMessage(message: any) {
       opponentBagTime = performance.now()
     }
   }
+  if (message.type === 'timer' && message.player !== identity) {
+    timers[1].end()
+    timers[1].remaining = message.msRemaining
+  }
   if (message.type === 'move') {
     message.player = identity ? 1 - message.player : message.player
+    if (message.player === 1 && timers[1].reference !== null) {
+      timers[1].end()
+      timers[1].remaining = message.msRemaining
+    }
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
@@ -278,6 +296,10 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
   }
 
+  for (let i = 0; i < timers.length; ++i) {
+    timeDisplays[i] = timers[i].display()
+  }
+
   frameId = window.requestAnimationFrame(draw)
 }
 
@@ -310,8 +332,12 @@ function requeue() {
 
 function commitMove(x1: number, y1: number, orientation: number) {
   if (gameType.value === 'pausing') {
-    websocket.makeMove(x1, y1, orientation)
-    moveSent = true
+    if (timers[0].end()) {
+      websocket.timeout()
+    } else {
+      websocket.makeMove(x1, y1, orientation)
+      moveSent = true
+    }
   } else if (game) {
     const playedMove = game.play(0, x1, y1, orientation)
     replay.moves.push(playedMove)
@@ -405,6 +431,8 @@ onUnmounted(() => {
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"
       :timeouts="timeouts"
+      :names="names"
+      :timeDisplays="timeDisplays"
     >
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"
@@ -416,3 +444,9 @@ onUnmounted(() => {
     </PlayingField>
   </main>
 </template>
+
+<style scoped>
+main {
+  height: 900px;
+}
+</style>

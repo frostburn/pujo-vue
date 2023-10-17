@@ -4,7 +4,8 @@ import {
   replayToTrack,
   type Replay,
   type GameState,
-  type TickResult
+  type TickResult,
+  VISIBLE_HEIGHT
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
@@ -16,7 +17,6 @@ import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 
 // TODO: Store game type in replay and show hands for realtime
-// TODO: Always show hands at the end
 
 // In frames per millisecond.
 const NOMINAL_FRAME_RATE = 30 / 1000
@@ -167,7 +167,7 @@ onUnmounted(() => {
         ref="svg"
         width="100%"
         height="100%"
-        viewBox="0 0 20 15"
+        viewBox="0 0 20 16.5"
         xmlns="http://www.w3.org/2000/svg"
       >
         <SVGDefs />
@@ -181,6 +181,12 @@ onUnmounted(() => {
             :showHand="time >= finalTime"
             :timeout="timeouts[0]"
           />
+          <clipPath id="left-name-clip">
+            <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+          </clipPath>
+          <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+            {{ replay.metadata.names[0] }}
+          </text>
         </g>
         <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
           <PlayingScreen
@@ -192,6 +198,12 @@ onUnmounted(() => {
             :showHand="time >= finalTime"
             :timeout="timeouts[1]"
           />
+          <clipPath id="left-name-clip">
+            <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+          </clipPath>
+          <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+            {{ replay.metadata.names[1] }}
+          </text>
         </g>
       </svg>
     </div>
@@ -219,6 +231,7 @@ onUnmounted(() => {
 .container {
   display: flex;
   flex-direction: row;
+  height: 840px;
 }
 
 .container div {

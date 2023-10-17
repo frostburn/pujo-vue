@@ -347,13 +347,13 @@ const handSymbols = computed(() =>
     ></use>
   </g>
   <!--Score-->
-  <text :y="VISIBLE_HEIGHT + 1">
+  <text x="0" :y="VISIBLE_HEIGHT + 1">
     <tspan class="score-label">Score:</tspan>
     <tspan class="score">{{ score }}</tspan>
   </text>
   <!--Win counter-->
   <use href="#trophy" x="-0.7" y="10.8"></use>
-  <text class="score" text-anchor="middle" :x="-0.7" :y="12">
+  <text class="score" text-anchor="middle" x="-0.7" y="12">
     {{ wins }}
   </text>
 </template>
