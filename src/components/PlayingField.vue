@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { GHOST_Y, type GameState, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import PlayingCursor from './PlayingCursor.vue'
 import PlayingScreen from './PlayingScreen.vue'
@@ -17,6 +17,7 @@ import {
   SCREEN_Y
 } from '@/util'
 import type { Chain } from '@/chain-deck'
+import PlayingButton from './PlayingButton.vue'
 
 const props = defineProps<{
   gameStates: GameState[] | null
@@ -46,6 +47,12 @@ const cursor = ref<typeof PlayingCursor | null>(null)
 
 const cursorLocked = ref(false)
 const cursorY = ref(1)
+
+const hardDrop = ref(Boolean(JSON.parse(localStorage.getItem('hardDrop') || 'true')))
+
+watch(hardDrop, (newValue) => {
+  localStorage.setItem('hardDrop', JSON.stringify(newValue))
+})
 
 // User interaction.
 
@@ -145,7 +152,7 @@ function lockCursor() {
 
 function commitMove(x1: number, y1: number, orientation: number) {
   cursorLocked.value = false
-  emit('commit', x1, y1, orientation)
+  emit('commit', x1, y1, orientation, hardDrop.value)
 }
 
 const x1 = computed<number>(() => {
@@ -303,6 +310,16 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         <tspan :x="LEFT_SCREEN_X + WIDTH + 2.5" dy="0.35">s</tspan>
       </text>
     </g>
+    <PlayingButton
+      @mousedown.stop
+      @click="hardDrop = !hardDrop"
+      :class="{ active: hardDrop }"
+      :x="LEFT_SCREEN_X + WIDTH + 0.4"
+      :y="SCREEN_Y + 4.6"
+      :width="3"
+    >
+      Hard Drop
+    </PlayingButton>
     <g @mousedown.stop :transform="`translate(${CONTROLS_X}, ${CONTROLS_Y})`">
       <slot></slot>
     </g>

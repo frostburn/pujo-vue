@@ -122,7 +122,7 @@ for (let i = 0; i < workerAnticipation; ++i) {
   workerGame.tick()
 }
 
-let userMove: { x1: number; y1: number; orientation: number } | null = null
+let userMove: { x1: number; y1: number; orientation: number; hardDrop: boolean } | null = null
 
 let referenceTime: DOMHighResTimeStamp | null = null
 let referenceAge = 0
@@ -145,8 +145,8 @@ function tick() {
   }
 
   if (userMove && !game.games[0].busy) {
-    const { x1, y1, orientation } = userMove
-    const playedMove = game.play(0, x1, y1, orientation)
+    const { x1, y1, orientation, hardDrop } = userMove
+    const playedMove = game.play(0, x1, y1, orientation, hardDrop)
     lastAgeDrawn = -1
     replay.moves.push(playedMove)
     userMove = null
@@ -310,8 +310,8 @@ const preIgnitions = computed(() => {
     .slice(WIDTH * (GHOST_Y + 1))
 })
 
-function commitMove(x1: number, y1: number, orientation: number) {
-  userMove = { x1, y1, orientation }
+function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
+  userMove = { x1, y1, orientation, hardDrop }
 }
 
 function selectDifficulty(index: number) {
@@ -401,17 +401,17 @@ onUnmounted(() => {
         :key="i"
         :class="{ active: botActive && difficultyIndex === i }"
         @click.stop="selectDifficulty(i)"
-        :text="diff.label"
         :x="0"
         :y="i"
-      />
+        >{{ diff.label }}</PlayingButton
+      >
       <PlayingButton
         :class="{ active: gameOver, disabled: !gameOver }"
         @click.stop="restart"
-        text="Restart"
         :x="0"
         :y="6"
-      />
+        >Restart</PlayingButton
+      >
     </PlayingField>
   </main>
 </template>

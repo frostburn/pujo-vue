@@ -347,12 +347,12 @@ function requeue() {
   }
 }
 
-function commitMove(x1: number, y1: number, orientation: number) {
+function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
   if (gameType.value === 'pausing') {
     if (timers[0].end()) {
       websocket.timeout()
     } else {
-      websocket.makeMove(x1, y1, orientation, timers[0].remaining)
+      websocket.makeMove(x1, y1, orientation, hardDrop, timers[0].remaining)
       moveSent = true
     }
   } else if (game) {
@@ -456,10 +456,10 @@ onUnmounted(() => {
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"
         @click.stop="requeue"
-        text="Requeue"
         :x="0"
         :y="0"
-      />
+        >Requeue</PlayingButton
+      >
     </PlayingField>
   </main>
 </template>

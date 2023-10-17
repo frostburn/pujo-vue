@@ -87,14 +87,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
     x1: number,
     y1: number,
     orientation: number,
-    msRemaining: number,
-    hardDrop = false
+    hardDrop: boolean,
+    msRemaining: number
   ) {
     if (guard()) {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, msRemaining, hardDrop }))
+    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, hardDrop, msRemaining }))
   }
 
   function passMove() {
