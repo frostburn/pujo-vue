@@ -3,13 +3,13 @@ import { onMounted, onUnmounted } from 'vue'
 import { useWebSocketStore } from '@/stores/websocket'
 import { useAudioContextStore } from './stores/audio-context'
 
-declare const __WS_URL__: string
+const WS_URL = import.meta.env.VITE_WS_URL || 'wss://pujo.lumipakkanen.com/ws/'
 
 const websocket = useWebSocketStore()
 const audioContext = useAudioContextStore()
 
 function hello() {
-  console.log(`Websocket opened to ${__WS_URL__}`)
+  console.log(`Websocket opened to ${WS_URL}`)
 }
 
 function initializeAudio() {
@@ -19,7 +19,7 @@ function initializeAudio() {
 onMounted(async () => {
   console.log('Mounted the app')
 
-  const socket = new WebSocket(__WS_URL__)
+  const socket = new WebSocket(WS_URL)
 
   websocket.addOpenListener(hello)
 

@@ -8,13 +8,10 @@ const commitHash = require('child_process')
   .toString()
   .trim();
 
-const wsUrl = process.env.PUJO_WS_URL || 'wss://pujo.lumipakkanen.com/ws/'
-
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
     '__COMMIT_HASH__': JSON.stringify(commitHash),
-    '__WS_URL__': JSON.stringify(wsUrl),
   },
   plugins: [
     vue(),
