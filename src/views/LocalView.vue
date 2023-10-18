@@ -184,7 +184,9 @@ function tick() {
 
     if (!gameOver.value && tickResults.some((t) => t.lockedOut)) {
       if (tickResults[0].lockedOut) {
-        if (!tickResults[1].lockedOut) {
+        if (tickResults[1].lockedOut) {
+          replay.result.winner = undefined
+        } else {
           wins[1]++
           replay.result.winner = 1
         }
@@ -395,6 +397,7 @@ onUnmounted(() => {
       :timeouts="[false, false]"
       :names="[]"
       :timeDisplays="[]"
+      :timeDangers="[]"
     >
       <PlayingButton
         v-for="(diff, i) of DIFFICULTIES"

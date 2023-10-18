@@ -34,6 +34,7 @@ const props = defineProps<{
   timeouts: boolean[]
   names: string[]
   timeDisplays: string[]
+  timeDangers: boolean[]
 }>()
 
 const emit = defineEmits(['pass', 'commit'])
@@ -245,10 +246,18 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
     </template>
     <!--Timers-->
     <template v-if="timeDisplays.length">
-      <text class="score" :x="LEFT_SCREEN_X + WIDTH + 0.5" :y="SCREEN_Y + VISIBLE_HEIGHT + 2">
+      <text
+        :class="{ score: true, danger: timeDangers[0] }"
+        :x="LEFT_SCREEN_X + WIDTH + 0.5"
+        :y="SCREEN_Y + VISIBLE_HEIGHT + 2"
+      >
         {{ timeDisplays[0] }}
       </text>
-      <text class="score" :x="RIGHT_SCREEN_X + WIDTH + 0.5" :y="SCREEN_Y + VISIBLE_HEIGHT + 2">
+      <text
+        :class="{ score: true, danger: timeDangers[1] }"
+        :x="RIGHT_SCREEN_X + WIDTH + 0.5"
+        :y="SCREEN_Y + VISIBLE_HEIGHT + 2"
+      >
         {{ timeDisplays[1] }}
       </text>
     </template>

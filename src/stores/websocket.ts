@@ -37,14 +37,16 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
   }
 
-  function guard() {
+  function guard(hard = true) {
     const socket = webSocket.value
     if (socket === null) {
       console.warn('No WebSocket assigned')
       return true
     }
     if (socket.readyState !== 1) {
-      console.warn('WebSocket not ready yet')
+      if (hard) {
+        console.warn('WebSocket not ready yet')
+      }
       return true
     }
     return false
@@ -61,7 +63,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function requestGame() {
-    if (guard()) {
+    if (guard(false)) {
       // eslint-disable-next-line no-inner-declarations
       function requestOnOpen() {
         const socket = webSocket.value!

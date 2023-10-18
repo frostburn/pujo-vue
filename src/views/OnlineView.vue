@@ -85,6 +85,7 @@ const wins = reactive([0, 0])
 const timeouts = reactive([false, false])
 const names = reactive(['', ''])
 const timeDisplays = reactive(['0:00', '0:00'])
+const timeDangers = reactive([false, false])
 let tickId: number | null = null
 let referenceAge = 0
 let referenceTime: DOMHighResTimeStamp | null = null
@@ -180,6 +181,8 @@ function onMessage(message: any) {
     } else if (message.result === 'loss') {
       replay.result.winner = 1
       wins[1]++
+    } else {
+      replay.result.winner = undefined
     }
     localStorage.setItem('replays.latest', JSON.stringify(replay))
     if (message.reason === 'timeout') {
@@ -310,7 +313,12 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   }
 
   for (let i = 0; i < timers.length; ++i) {
-    timeDisplays[i] = timers[i].display()
+    timeDangers[i] = timers[i].timeRemaining() < 20000
+    if (timeDangers[i]) {
+      timeDisplays[i] = timers[i].display(1)
+    } else {
+      timeDisplays[i] = timers[i].display()
+    }
   }
 
   if (gameType.value === 'pausing' && timers[0].flagged()) {
@@ -452,6 +460,7 @@ onUnmounted(() => {
       :timeouts="timeouts"
       :names="names"
       :timeDisplays="timeDisplays"
+      :timeDangers="timeDangers"
     >
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"

@@ -490,6 +490,11 @@ const leafVeinDs = [
     monospace;
   fill: azure;
 }
+.danger {
+  fill: mistyrose;
+  stroke: red;
+  stroke-width: 0.02;
+}
 .chain {
   font:
     bold 0.8px 'Arial',
