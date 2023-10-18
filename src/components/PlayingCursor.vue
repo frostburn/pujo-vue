@@ -211,6 +211,15 @@ const WASD_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD']
 
 function onKeyDown(event: KeyboardEvent) {
   const code = event.code
+  if (
+    code === 'Space' ||
+    code === 'J' ||
+    code === 'K' ||
+    ARROW_KEYS.includes(code) ||
+    WASD_KEYS.includes(code)
+  ) {
+    event.preventDefault()
+  }
   if (code === 'Space' && !event.repeat && !props.locked && props.active) {
     lockPrimary()
   }
