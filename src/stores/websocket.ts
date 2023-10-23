@@ -9,8 +9,8 @@ type MessageListener = (message: any) => void
 export const useWebSocketStore = defineStore('websocket', () => {
   const webSocket = ref<WebSocket | null>(null)
 
-  const openListeners: Set<OpenListener> = new Set()
-  const messageListeners: Set<MessageListener> = new Set()
+  const openListeners: OpenListener[] = []
+  const messageListeners: MessageListener[] = []
 
   function assign(socket: WebSocket) {
     webSocket.value = socket
@@ -53,13 +53,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function sendGameRequest(socket: WebSocket) {
-    socket.send(
-      JSON.stringify({
-        type: 'game request',
-        name: localStorage.getItem('name') || undefined,
-        clientInfo: getClientInfo()
-      })
-    )
+    socket.send(JSON.stringify({ type: 'game request' }))
   }
 
   function requestGame() {
@@ -75,6 +69,38 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
     const socket = webSocket.value!
     sendGameRequest(socket)
+  }
+
+  function _sendUserData(socket: WebSocket) {
+    const username = localStorage.getItem('name') || 'Anonymous'
+    let authUuid = localStorage.getItem('authUuid')
+    if (authUuid === null) {
+      authUuid = crypto.randomUUID()
+      localStorage.setItem('authUuid', authUuid)
+    }
+    socket.send(
+      JSON.stringify({
+        type: 'user',
+        username,
+        authUuid,
+        clientInfo: getClientInfo()
+      })
+    )
+  }
+
+  function sendUserData() {
+    if (guard(false)) {
+      // eslint-disable-next-line no-inner-declarations
+      function requestOnOpen() {
+        const socket = webSocket.value!
+        _sendUserData(socket)
+        removeOpenListener(requestOnOpen)
+      }
+      addOpenListener(requestOnOpen)
+      return
+    }
+    const socket = webSocket.value!
+    _sendUserData(socket)
   }
 
   function requestState() {
@@ -126,18 +152,18 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   function addOpenListener(listener: OpenListener) {
-    openListeners.add(listener)
+    openListeners.push(listener)
   }
 
   function removeOpenListener(listener: OpenListener) {
-    openListeners.delete(listener)
+    openListeners.splice(openListeners.indexOf(listener), 1)
   }
 
   function addMessageListener(listener: MessageListener) {
-    messageListeners.add(listener)
+    messageListeners.push(listener)
   }
   function removeMessageListener(listener: MessageListener) {
-    messageListeners.delete(listener)
+    messageListeners.splice(messageListeners.indexOf(listener), 1)
   }
 
   return {
@@ -145,6 +171,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     assign,
     unassign,
     requestGame,
+    sendUserData,
     requestState,
     makeMove,
     passMove,

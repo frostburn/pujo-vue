@@ -49,6 +49,7 @@ onmessage = (e) => {
     e.data.throttleFrames
   const game = new SimpleGame(
     screen,
+    gameData.targetPoints,
     gameData.pointResidue,
     gameData.allClearBonus,
     gameData.pendingGarbage,

@@ -26,7 +26,7 @@ const props = defineProps<{
   fallMu: number
   preIgnitions: boolean[] | null
   chainCards: Chain[]
-  wins: number
+  wins: string
   showHand: boolean
   timeout: boolean
 }>()

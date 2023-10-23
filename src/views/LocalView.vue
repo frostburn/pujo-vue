@@ -13,7 +13,8 @@ import {
   VISIBLE_HEIGHT,
   GHOST_Y,
   WIDTH,
-  PASS
+  PASS,
+  DEFAULT_TARGET_POINTS
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAudioContextStore } from '@/stores/audio-context'
@@ -95,20 +96,24 @@ let lastAgeDrawn = -1
 let gameSeed = randomSeed()
 let colorSelection = randomColorSelection()
 let screenSeed = randomSeed()
-let game = new MultiplayerGame(gameSeed, colorSelection, screenSeed)
+const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
+let game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints)
 let chainDeck = new ChainDeck()
 const replay: Replay = {
   gameSeed,
   screenSeed,
   colorSelection,
+  targetPoints,
   moves: [],
   metadata: {
     event: 'Local Play vs. CPU',
     names: [localStorage.getItem('name') || 'Anonymous', `${difficulty.value.label} (CPU)`],
+    elos: [],
     priorWins: [0, 0],
     site: 'https://pujo.lumipakkanen.com',
     round: 0,
-    msSince1970: new Date().valueOf()
+    msSince1970: new Date().valueOf(),
+    type: 'realtime'
   },
   result: {
     reason: 'ongoing'
