@@ -3,7 +3,10 @@
 #app {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding-top: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 1rem;
 
   font-weight: normal;
 
@@ -17,6 +20,7 @@
 
 #app main {
   flex: 1 1 auto;
+  height: 92vh;
 }
 
 a,
