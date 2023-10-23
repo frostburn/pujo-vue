@@ -177,6 +177,18 @@ const y2 = computed<number>(() => {
   return cursor.value.snapY
 })
 
+const winDisplays = computed(() =>
+  props.wins.map((win) => {
+    if (win === 0.5) {
+      return '½'
+    } else if (win === Math.floor(win) + 0.5) {
+      return `${Math.floor(win)}½`
+    } else {
+      return win.toString()
+    }
+  })
+)
+
 defineExpose({ x1, y1: cursorY, x2, y2 })
 </script>
 
@@ -195,7 +207,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :fallMu="fallMu"
         :preIgnitions="preIgnitions"
         :chainCards="chainCards[0]"
-        :wins="wins[0]"
+        :wins="winDisplays[0]"
         :showHand="false"
         :timeout="timeouts[0]"
       />
@@ -206,7 +218,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         :fallMu="fallMu"
         :preIgnitions="null"
         :chainCards="chainCards[1]"
-        :wins="wins[1]"
+        :wins="winDisplays[1]"
         :showHand="true"
         :timeout="timeouts[1]"
       />

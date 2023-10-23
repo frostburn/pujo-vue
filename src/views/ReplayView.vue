@@ -16,8 +16,6 @@ import { ChainDeck } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 
-// TODO: Store game type in replay and show hands for realtime
-
 // In frames per millisecond.
 const NOMINAL_FRAME_RATE = 30 / 1000
 
@@ -112,6 +110,8 @@ const timeModel = computed({
   }
 })
 
+const showHand = computed(() => time.value >= finalTime || replay.metadata.type === 'realtime')
+
 watch(frameRate, () => {
   referenceTimeStamp = null
   referenceTime = time.value
@@ -150,6 +150,19 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   drawId = requestAnimationFrame(draw)
 }
 
+const winDisplays = computed(() => {
+  if (time.value < finalTime) {
+    return ['0', '0']
+  }
+  if (replay.result.winner === 0) {
+    return ['1', '0']
+  } else if (replay.result.winner === undefined) {
+    return ['½', '½']
+  } else {
+    return ['0', '1']
+  }
+})
+
 onMounted(() => {
   drawId = requestAnimationFrame(draw)
 })
@@ -179,8 +192,8 @@ onUnmounted(() => {
             :fallMu="fallMu"
             :preIgnitions="null"
             :chainCards="chainCards[0]"
-            :wins="gameStates && gameStates[1].lockedOut ? 1 : 0"
-            :showHand="time >= finalTime"
+            :wins="winDisplays[0]"
+            :showHand="showHand"
             :timeout="timeouts[0]"
           />
           <clipPath id="left-name-clip">
@@ -196,8 +209,8 @@ onUnmounted(() => {
             :fallMu="fallMu"
             :preIgnitions="null"
             :chainCards="chainCards[1]"
-            :wins="gameStates && gameStates[0].lockedOut ? 1 : 0"
-            :showHand="time >= finalTime"
+            :wins="winDisplays[1]"
+            :showHand="showHand"
             :timeout="timeouts[1]"
           />
           <clipPath id="left-name-clip">

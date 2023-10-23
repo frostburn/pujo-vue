@@ -12,7 +12,8 @@ import {
   VISIBLE_HEIGHT,
   GHOST_Y,
   FischerTimer,
-  OnePlayerGame
+  OnePlayerGame,
+  DEFAULT_TARGET_POINTS
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -64,14 +65,17 @@ const replay: Replay = {
   gameSeed: -1,
   screenSeed: -1,
   colorSelection: [],
+  targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
   moves: [],
   metadata: {
     event: '',
     names: [],
+    elos: [],
     priorWins: [],
     site: '',
     round: 0,
-    msSince1970: new Date().valueOf()
+    msSince1970: new Date().valueOf(),
+    type: 'pausing'
   },
   result: {
     reason: 'ongoing'
@@ -109,11 +113,17 @@ function onMessage(message: any) {
     console.log(message)
   }
   if (message.type === 'game params') {
-    game = new MultiplayerGame(null, message.colorSelection, message.screenSeed)
+    game = new MultiplayerGame(
+      null,
+      message.colorSelection,
+      message.screenSeed,
+      message.targetPoints
+    )
     identity = message.identity as number
     replay.gameSeed = -1
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
+    replay.targetPoints = message.targetPoints
     replay.moves.length = 0
     replay.metadata = message.metadata
     names[0] = message.metadata.names[identity]
@@ -173,16 +183,19 @@ function onMessage(message: any) {
   }
   if (message.type === 'game result') {
     replay.gameSeed = message.gameSeed
+    replay.result.winner = message.winner
     replay.result.reason = message.reason
     replay.metadata.endTime = message.msSince1970
-    if (message.result === 'win') {
-      replay.result.winner = 0
-      wins[0]++
-    } else if (message.result === 'loss') {
-      replay.result.winner = 1
-      wins[1]++
+    if (message.winner === identity) {
+      wins[0] = 1
+      wins[1] = 0
+    } else if (message.winner === undefined) {
+      // Negative powers of two have exact representation so this is safe
+      wins[0] = 0.5
+      wins[1] = 0.5
     } else {
-      replay.result.winner = undefined
+      wins[0] = 0
+      wins[1] = 1
     }
     localStorage.setItem('replays.latest', JSON.stringify(replay))
     if (message.reason === 'timeout') {
@@ -423,6 +436,7 @@ const preIgnitions = computed(() => {
 
 onMounted(() => {
   websocket.addMessageListener(onMessage)
+  websocket.sendUserData()
   websocket.requestGame()
   canRequeue.value = false
   frameId = window.requestAnimationFrame(draw)
