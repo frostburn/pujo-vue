@@ -322,6 +322,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
       :class="{ control: true, active: canPass, disabled: !canPass }"
       @mousedown.stop
       @click="pass"
+      @touchstart.stop="pass"
     >
       <rect :x="LEFT_SCREEN_X + WIDTH + 2" :y="SCREEN_Y - 0.1" rx="0.1" width="1" height="2"></rect>
       <text class="pass" :y="SCREEN_Y + 0.5">
@@ -334,6 +335,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
     <PlayingButton
       @mousedown.stop
       @click="hardDrop = !hardDrop"
+      @touchstart.stop="hardDrop = !hardDrop"
       :class="{ active: hardDrop }"
       :x="LEFT_SCREEN_X + WIDTH + 0.4"
       :y="SCREEN_Y + 4.6"

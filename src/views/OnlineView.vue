@@ -479,6 +479,7 @@ onUnmounted(() => {
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"
         @click.stop="requeue"
+        @touchstart.stop="requeue"
         :x="0"
         :y="0"
         >Requeue</PlayingButton
