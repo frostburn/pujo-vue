@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { GHOST_Y, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
-import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 
 // Please note that orbit distances less than 0.5 would need updates to the second panel during cursor movement.
 const MIN_ORBIT_DISTANCE = 0.6
@@ -79,15 +79,15 @@ const orientation = computed({
 
 let pt: DOMPoint | null = null
 
-function containerCoords(event: MouseEvent) {
+function containerCoords(x: number, y: number) {
   if (props.svg === null || props.container === null) {
     return
   }
   if (pt === null) {
     pt = props.svg.createSVGPoint()
   }
-  pt.x = event.x
-  pt.y = event.y
+  pt.x = x
+  pt.y = y
   return pt.matrixTransform(props.container.getScreenCTM()?.inverse())
 }
 
@@ -123,7 +123,7 @@ function orbitSecondPanel(coords: Coords) {
 }
 
 function onMouseMove(event: MouseEvent) {
-  const coords = containerCoords(event)
+  const coords = containerCoords(event.x, event.y)
   if (coords === undefined) {
     return
   }
@@ -185,7 +185,7 @@ function onMouseDown(event: MouseEvent) {
   if (event.button !== 0 || props.locked || !props.active) {
     return
   }
-  const coords = containerCoords(event)
+  const coords = containerCoords(event.x, event.y)
   if (coords === undefined) {
     return
   }
@@ -198,7 +198,7 @@ function onMouseUp(event: MouseEvent) {
   if (event.button !== 0 || !props.locked || !props.active) {
     return
   }
-  const coords = containerCoords(event)
+  const coords = containerCoords(event.x, event.y)
   if (coords === undefined) {
     return
   }
@@ -288,10 +288,80 @@ function onKeyUp(event: KeyboardEvent) {
   }
 }
 
+let lockingTouch: Touch | undefined
+
+function onTouchStart(event: TouchEvent) {
+  // Prevent the touch from registering as a mousedown naturally.
+  event.preventDefault()
+
+  // Do pretty much what a mousedown does.
+  if (props.locked || !props.active) {
+    return
+  }
+  lockingTouch = event.touches[0]
+  const coords = containerCoords(lockingTouch.clientX, lockingTouch.clientY)
+  if (coords === undefined) {
+    return
+  }
+  setPrimaryCoords(coords)
+  lockPrimary()
+  nextTick(() => orbitSecondPanel(coords))
+}
+
+function onTouchMove(event: TouchEvent) {
+  // Prevent the touch from registering as a mousemove naturally.
+  event.preventDefault()
+
+  // Do pretty much what a mousemove does.
+  const coords = containerCoords(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
+  if (coords === undefined) {
+    return
+  }
+
+  if (props.locked) {
+    orbitSecondPanel(coords)
+  } else {
+    setPrimaryCoords(coords)
+  }
+}
+
+function onTouchEnd(event: TouchEvent) {
+  // Prevent the touch from registering as a mouseup naturally.
+  event.preventDefault()
+
+  // Do pretty much what a mouseup does.
+  if (!props.locked || !props.active) {
+    return
+  }
+  for (const touch of event.changedTouches) {
+    if (touch.identifier !== lockingTouch?.identifier) {
+      continue
+    }
+    const coords = containerCoords(touch.clientX, touch.clientY)
+    if (coords === undefined) {
+      return
+    }
+    orbitSecondPanel(coords)
+    commitMove()
+    lockingTouch = undefined
+  }
+}
+
+watch(
+  () => props.svg,
+  (newValue) => {
+    if (newValue !== null) {
+      newValue.addEventListener('mousedown', onMouseDown)
+      newValue.addEventListener('touchstart', onTouchStart)
+      newValue.addEventListener('touchmove', onTouchMove)
+      newValue.addEventListener('touchend', onTouchEnd)
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   document.addEventListener('mousemove', onMouseMove)
-
-  document.addEventListener('mousedown', onMouseDown)
   document.addEventListener('mouseup', onMouseUp)
 
   document.addEventListener('keydown', onKeyDown)
@@ -300,12 +370,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onMouseMove)
-
-  document.removeEventListener('mousedown', onMouseDown)
   document.removeEventListener('mouseup', onMouseUp)
 
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('keyup', onKeyUp)
+
+  if (props.svg) {
+    props.svg.removeEventListener('mousedown', onMouseDown)
+    props.svg.removeEventListener('touchstart', onTouchStart)
+    props.svg.removeEventListener('touchmove', onTouchMove)
+    props.svg.removeEventListener('touchend', onTouchEnd)
+  }
 })
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

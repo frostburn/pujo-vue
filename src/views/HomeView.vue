@@ -20,7 +20,6 @@ watch(name, (newValue) => localStorage.setItem('name', newValue))
       <li>Private matchmaking</li>
       <li>Online profiles and ranking</li>
       <li>Storing more than the latest replay</li>
-      <li>Touchscreen support</li>
       <li>Smartphone support (responsive design)</li>
       <li>Classic (gravity-based) interface</li>
       <li>Layout tweaks</li>

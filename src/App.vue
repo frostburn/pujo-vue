@@ -25,6 +25,7 @@ onMounted(async () => {
 
   websocket.assign(socket)
 
+  document.addEventListener('touchstart', initializeAudio)
   document.addEventListener('mousedown', initializeAudio)
   document.addEventListener('keydown', initializeAudio)
 })
@@ -36,6 +37,7 @@ onUnmounted(() => {
 
   websocket.unassign()
 
+  document.removeEventListener('touchstart', initializeAudio)
   document.removeEventListener('mousedown', initializeAudio)
   document.removeEventListener('keydown', initializeAudio)
 
