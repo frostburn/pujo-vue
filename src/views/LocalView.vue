@@ -97,13 +97,15 @@ let gameSeed = randomSeed()
 let colorSelection = randomColorSelection()
 let screenSeed = randomSeed()
 const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
-let game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints)
+const marginFrames = Infinity
+let game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
 let chainDeck = new ChainDeck()
 const replay: Replay = {
   gameSeed,
   screenSeed,
   colorSelection,
   targetPoints,
+  marginFrames,
   moves: [],
   metadata: {
     event: 'Local Play vs. CPU',
@@ -344,7 +346,7 @@ function restart() {
   gameSeed = randomSeed()
   colorSelection = randomColorSelection()
   screenSeed = randomSeed()
-  game = new MultiplayerGame(gameSeed, colorSelection, screenSeed)
+  game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
   chainDeck = new ChainDeck()
   replay.gameSeed = gameSeed
   replay.screenSeed = screenSeed

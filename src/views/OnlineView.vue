@@ -13,7 +13,8 @@ import {
   GHOST_Y,
   FischerTimer,
   OnePlayerGame,
-  DEFAULT_TARGET_POINTS
+  DEFAULT_TARGET_POINTS,
+  DEFAULT_MARGIN_FRAMES
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -66,6 +67,7 @@ const replay: Replay = {
   screenSeed: -1,
   colorSelection: [],
   targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
+  marginFrames: DEFAULT_MARGIN_FRAMES,
   moves: [],
   metadata: {
     event: '',
@@ -117,13 +119,15 @@ function onMessage(message: any) {
       null,
       message.colorSelection,
       message.screenSeed,
-      message.targetPoints
+      message.targetPoints,
+      message.marginFrames
     )
     identity = message.identity as number
     replay.gameSeed = -1
     replay.colorSelection = message.colorSelection
     replay.screenSeed = message.screenSeed
     replay.targetPoints = message.targetPoints
+    replay.marginFrames = message.marginFrames
     replay.moves.length = 0
     replay.metadata = message.metadata
     names[0] = message.metadata.names[identity]

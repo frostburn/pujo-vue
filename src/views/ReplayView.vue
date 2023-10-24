@@ -5,7 +5,9 @@ import {
   type Replay,
   type GameState,
   type TickResult,
-  VISIBLE_HEIGHT
+  VISIBLE_HEIGHT,
+  parseReplay,
+  type TrackItem
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
@@ -23,17 +25,20 @@ const SNAPSHOT_INTERVAL = 30
 
 const audioContext = useAudioContextStore()
 
-const replay: Replay = JSON.parse(localStorage.getItem('replays.latest')!)
+const serialized = localStorage.getItem('replays.latest')
+
+let replay: Replay | undefined
+
+let game = new MultiplayerGame()
+let deck = new ChainDeck()
+let replayIndex = 0
+let finalTime = Infinity
+let track: TrackItem[] = []
 
 const snapshots: MultiplayerGame[] = []
 const snapDecks: ChainDeck[] = []
 
-let game = new MultiplayerGame(replay.gameSeed, replay.colorSelection, replay.screenSeed)
-let deck = new ChainDeck()
-let replayIndex = 0
-
 const tempDeck = new ChainDeck()
-
 function takeSnapshot(g: MultiplayerGame, tickResults: TickResult[]) {
   if (!(g.age % SNAPSHOT_INTERVAL)) {
     snapshots.push(g.clone(true))
@@ -44,9 +49,21 @@ function takeSnapshot(g: MultiplayerGame, tickResults: TickResult[]) {
   }
 }
 
-const track = [...replayToTrack(replay, takeSnapshot)]
+if (serialized) {
+  replay = parseReplay(serialized)
 
-const finalTime = track[track.length - 1].time
+  game = new MultiplayerGame(
+    replay.gameSeed,
+    replay.colorSelection,
+    replay.screenSeed,
+    replay.targetPoints,
+    replay.marginFrames
+  )
+
+  track = [...replayToTrack(replay, takeSnapshot)]
+
+  finalTime = track[track.length - 1].time
+}
 
 let drawId: number | null = null
 let referenceTimeStamp: DOMHighResTimeStamp | null = null
@@ -57,6 +74,10 @@ const frameRate = ref(0)
 const timeouts = reactive([false, false])
 
 const gameAndDeckStates = computed<[GameState[], TickResult[] | null, ChainDeck]>(() => {
+  if (!replay) {
+    return [[], null, deck]
+  }
+
   if (time.value < 0) {
     throw new Error('Negative times not supported')
   }
@@ -110,7 +131,12 @@ const timeModel = computed({
   }
 })
 
-const showHand = computed(() => time.value >= finalTime || replay.metadata.type === 'realtime')
+const showHand = computed(() => {
+  if (!replay) {
+    return false
+  }
+  return time.value >= finalTime || replay.metadata.type === 'realtime'
+})
 
 watch(frameRate, () => {
   referenceTimeStamp = null
@@ -125,6 +151,9 @@ function deltaTime(delta: number) {
 }
 
 function draw(timeStamp: DOMHighResTimeStamp) {
+  if (!replay) {
+    return
+  }
   if (referenceTimeStamp === null) {
     referenceTimeStamp = timeStamp
   }
@@ -151,7 +180,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 }
 
 const winDisplays = computed(() => {
-  if (time.value < finalTime) {
+  if (time.value < finalTime || !replay) {
     return ['0', '0']
   }
   if (replay.result.winner === 0) {
@@ -176,7 +205,7 @@ onUnmounted(() => {
 
 <template>
   <main>
-    <div class="container">
+    <div class="container" v-if="replay">
       <ReplayTrack :track="track" :time="time" />
       <svg
         ref="svg"
@@ -222,6 +251,7 @@ onUnmounted(() => {
         </g>
       </svg>
     </div>
+    <div class="container" v-else><p>No latest replay found.</p></div>
     <div>
       <input type="range" min="0" :max="finalTime" step="any" v-model="timeModel" />
     </div>
