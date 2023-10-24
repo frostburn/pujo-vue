@@ -59,7 +59,7 @@ onUnmounted(() => {
 <style scoped>
 nav {
   width: 100%;
-  font-size: 12px;
+  font-size: 19px;
   text-align: center;
 }
 
