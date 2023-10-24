@@ -23,6 +23,7 @@ export const useAudioContextStore = defineStore('audio-context', () => {
   // Should be called in response to user interaction.
   async function initialize() {
     if (context.value) {
+      context.value.resume()
       return
     }
     // XXX: Build is broken. Hack it together.
