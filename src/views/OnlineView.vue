@@ -18,24 +18,7 @@ import {
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
-
-// === Type definitions ===
-
-type NormalMove = {
-  player: number
-  x1: number
-  y1: number
-  orientation: number
-  hardDrop: boolean
-  pass: false
-}
-
-type PassingMove = {
-  player: number
-  pass: true
-}
-
-type Move = NormalMove | PassingMove
+import type { ServerMessage, ServerMoveMessage } from '@/server-api'
 
 // === Constants ===
 
@@ -46,12 +29,9 @@ const LOG = false
 // Server connection
 const websocket = useWebSocketStore()
 let identity: number | null = null
-// Silly linter is silly
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-let moveSent = false
 let opponentBagTime: DOMHighResTimeStamp | null = null
 const bagQueues: number[][][] = [[], []]
-const moveQueues: Move[][] = [[], []]
+const moveQueues: ServerMoveMessage[][] = [[], []]
 
 const audioContext = useAudioContextStore()
 
@@ -110,7 +90,7 @@ const playingField = ref<typeof PlayingField | null>(null)
 
 // Server connection
 
-function onMessage(message: any) {
+function onMessage(message: ServerMessage) {
   if (LOG) {
     console.log(message)
   }
@@ -133,8 +113,13 @@ function onMessage(message: any) {
     names[0] = message.metadata.names[identity]
     names[1] = message.metadata.names[1 - identity]
     replay.metadata.names = [...names]
-    timers[0] = FischerTimer.fromString(message.metadata.timeControl)
-    timers[1] = FischerTimer.fromString(message.metadata.timeControl)
+    if (message.metadata.timeControl) {
+      timers[0] = FischerTimer.fromString(message.metadata.timeControl)
+      timers[1] = FischerTimer.fromString(message.metadata.timeControl)
+    } else {
+      timers[0] = new FischerTimer()
+      timers[1] = new FischerTimer()
+    }
     bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameFrameRate.value = 45 / 1000
@@ -144,7 +129,6 @@ function onMessage(message: any) {
     lastTickTime = null
     lastAgeDrawn = -1
     opponentBagTime = null
-    moveSent = false
     chainDeck = new ChainDeck()
     opponentThinkingOpacity.value = 0
     passing.value = false
@@ -362,7 +346,11 @@ function pass() {
     return
   }
   justPassed.value = true
-  websocket.passMove()
+  if (timers[0].end()) {
+    websocket.timeout()
+  } else {
+    websocket.passMove(timers[0].remaining)
+  }
 }
 
 function requeue() {
@@ -378,7 +366,6 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
       websocket.timeout()
     } else {
       websocket.makeMove(x1, y1, orientation, hardDrop, timers[0].remaining)
-      moveSent = true
     }
   } else if (game) {
     const playedMove = game.play(0, x1, y1, orientation)

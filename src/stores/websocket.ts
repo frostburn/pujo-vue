@@ -1,18 +1,24 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getClientInfo } from '@/util'
-import type { ReplayResultReason } from 'pujo-puyo-core'
+import type { ClientMessage, ServerMessage } from '@/server-api'
 
 type OpenListener = () => void
-type MessageListener = (message: any) => void
+type MessageListener = (message: ServerMessage) => void
+
+export class ClientSocket extends WebSocket {
+  sendMessage(message: ClientMessage) {
+    return super.send(JSON.stringify(message))
+  }
+}
 
 export const useWebSocketStore = defineStore('websocket', () => {
-  const webSocket = ref<WebSocket | null>(null)
+  const webSocket = ref<ClientSocket | null>(null)
 
   const openListeners: OpenListener[] = []
   const messageListeners: MessageListener[] = []
 
-  function assign(socket: WebSocket) {
+  function assign(socket: ClientSocket) {
     webSocket.value = socket
 
     socket.onopen = () => {
@@ -22,7 +28,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
 
     socket.onmessage = (event) => {
-      const message = JSON.parse(event.data)
+      const message: ServerMessage = JSON.parse(event.data)
       for (const listener of messageListeners) {
         listener(message)
       }
@@ -52,8 +58,11 @@ export const useWebSocketStore = defineStore('websocket', () => {
     return false
   }
 
-  function sendGameRequest(socket: WebSocket) {
-    socket.send(JSON.stringify({ type: 'game request' }))
+  function sendGameRequest(socket: ClientSocket) {
+    socket.sendMessage({
+      type: 'game request',
+      gameType: 'pausing'
+    })
   }
 
   function requestGame() {
@@ -71,21 +80,19 @@ export const useWebSocketStore = defineStore('websocket', () => {
     sendGameRequest(socket)
   }
 
-  function _sendUserData(socket: WebSocket) {
+  function _sendUserData(socket: ClientSocket) {
     const username = localStorage.getItem('name') || 'Anonymous'
     let authUuid = localStorage.getItem('authUuid')
     if (authUuid === null) {
       authUuid = crypto.randomUUID()
       localStorage.setItem('authUuid', authUuid)
     }
-    socket.send(
-      JSON.stringify({
-        type: 'user',
-        username,
-        authUuid,
-        clientInfo: getClientInfo()
-      })
-    )
+    socket.sendMessage({
+      type: 'user',
+      username,
+      authUuid,
+      clientInfo: getClientInfo()
+    })
   }
 
   function sendUserData() {
@@ -108,7 +115,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'simple state request' }))
+    socket.sendMessage({ type: 'simple state request' })
   }
 
   function makeMove(
@@ -122,15 +129,15 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', x1, y1, orientation, hardDrop, msRemaining }))
+    socket.sendMessage({ type: 'move', x1, y1, pass: false, orientation, hardDrop, msRemaining })
   }
 
-  function passMove() {
+  function passMove(msRemaining: number) {
     if (guard()) {
       return
     }
     const socket = webSocket.value!
-    socket.send(JSON.stringify({ type: 'move', pass: true }))
+    socket.sendMessage({ type: 'move', pass: true, msRemaining })
   }
 
   function timeout() {
@@ -138,8 +145,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    const reason: ReplayResultReason = 'timeout'
-    socket.send(JSON.stringify({ type: 'result', reason }))
+    socket.sendMessage({ type: 'result', reason: 'timeout' })
   }
 
   function resign() {
@@ -147,8 +153,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    const reason: ReplayResultReason = 'resignation'
-    socket.send(JSON.stringify({ type: 'result', reason }))
+    socket.sendMessage({ type: 'result', reason: 'resignation' })
   }
 
   function addOpenListener(listener: OpenListener) {
