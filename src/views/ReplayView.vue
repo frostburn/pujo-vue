@@ -206,7 +206,7 @@ onUnmounted(() => {
 <template>
   <main>
     <div class="container" v-if="replay">
-      <ReplayTrack :track="track" :time="time" />
+      <ReplayTrack :track="track" :time="time" :width="22" units="vh" />
       <svg
         ref="svg"
         width="100%"
@@ -276,7 +276,7 @@ onUnmounted(() => {
 .container {
   display: flex;
   flex-direction: row;
-  height: 840px;
+  height: 88vh;
 }
 
 .container div {
@@ -298,7 +298,7 @@ button {
 
 /* width */
 ::-webkit-scrollbar {
-  width: 7px;
+  width: 1vh;
 }
 
 /* Track */
