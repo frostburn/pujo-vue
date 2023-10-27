@@ -22,7 +22,7 @@ import type { ServerMessage, ServerMoveMessage } from '@/server-api'
 
 // === Constants ===
 
-const LOG = false
+const LOG = import.meta.env.DEV;
 
 // === State ===
 
@@ -195,6 +195,9 @@ function onMessage(message: ServerMessage) {
         timeouts.fill(true)
       }
     }
+    if (LOG) {
+      console.log('Switching to realtime')
+    }
     canRequeue.value = true
     gameFrameRate.value = 30 / 1000
     gameType.value = 'realtime'
@@ -207,6 +210,9 @@ function onMessage(message: ServerMessage) {
         if (move.player === 0) {
           surrogate.advanceColors()
         }
+      }
+      if (LOG) {
+        console.log('Setting surrogate bag', surrogate.bag);
       }
       game.games[0].bag = surrogate.bag
       game.games[0].jkiss = surrogate.jkiss
@@ -369,6 +375,9 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
     }
   } else if (game) {
     const playedMove = game.play(0, x1, y1, orientation)
+    if (LOG) {
+      console.log('Pushing realtime move', playedMove)
+    }
     replay.moves.push(playedMove)
     localStorage.setItem('replays.latest', JSON.stringify(replay))
   }
