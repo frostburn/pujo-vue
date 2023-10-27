@@ -2,7 +2,6 @@
 import { useWebSocketStore } from '@/stores/websocket'
 import PlayingField from '@/components/PlayingField.vue'
 import PlayingButton from '@/components/PlayingButton.vue'
-import { useAudioContextStore } from '@/stores/audio-context'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import {
   WIDTH,
@@ -10,14 +9,16 @@ import {
   type Replay,
   VISIBLE_HEIGHT,
   GHOST_Y,
-  FischerTimer,
-  OnePlayerGame,
   DEFAULT_TARGET_POINTS,
-  DEFAULT_MARGIN_FRAMES
+  DEFAULT_MARGIN_FRAMES,
+  NOMINAL_FRAME_RATE,
+  TimeWarpingMirror,
+  type PlayedMove
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
+import type { ServerMessage } from '@/server-api'
 import { processTickSounds } from '@/soundFX'
-import type { ServerMessage, ServerPausingMove } from '@/server-api'
+import { useAudioContextStore } from '@/stores/audio-context'
 
 // === Constants ===
 
@@ -28,17 +29,16 @@ const LOG = import.meta.env.DEV
 // Server connection
 const websocket = useWebSocketStore()
 let identity: number | null = null
-let opponentPieceTime: DOMHighResTimeStamp | null = null
-const moveQueues: ServerPausingMove[][] = [[], []]
 
 const audioContext = useAudioContextStore()
 
 // Frames per millisecond
-const gameFrameRate = ref(45 / 1000) // This is 50% faster than realtime
-const msPerFrame = computed(() => 1 / gameFrameRate.value)
-const gameType = ref<'pausing' | 'realtime'>('pausing')
-// Engine: In pausing mode the game is merely a mirror driven by the server.
+const FRAME_RATE = NOMINAL_FRAME_RATE / 1000
+const MS_PER_FRAME = 1 / FRAME_RATE
+// Engine: A mirror driven by the server.
+let mirror: TimeWarpingMirror<DeckedGame> | null = null
 let game: DeckedGame | null = null
+let lastMove: PlayedMove | null = null
 const replay: Replay = {
   gameSeed: -1,
   screenSeed: -1,
@@ -54,31 +54,29 @@ const replay: Replay = {
     site: '',
     round: 0,
     msSince1970: new Date().valueOf(),
-    type: 'pausing'
+    type: 'realtime'
   },
   result: {
     reason: 'ongoing'
   }
 }
-let timers = [new FischerTimer(), new FischerTimer()]
 const passing = ref(false)
 const justPassed = ref(false)
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
 const timeouts = reactive([false, false])
 const names = reactive(['', ''])
-const timeDisplays = reactive(['0:00', '0:00'])
-const timeDangers = reactive([false, false])
 let tickId: number | null = null
 let referenceAge = 0
 let referenceTime: DOMHighResTimeStamp | null = null
 let lastTickTime: DOMHighResTimeStamp | null = null
+let serverDelta = 0
+let currentAge = 0
 
 // Drawing / graphics
 const gameStates = ref<GameState[] | null>(null)
 const chainCards = ref<Chain[][]>([[], []])
 const fallMu = ref(0)
-const opponentThinkingOpacity = ref(0)
 
 let frameId: number | null = null
 let lastAgeDrawn = -1
@@ -92,7 +90,7 @@ function onMessage(message: ServerMessage) {
     console.log(message)
   }
   if (message.type === 'game params') {
-    game = new DeckedGame(
+    const origin = new DeckedGame(
       null,
       message.colorSelection,
       message.screenSeed,
@@ -100,8 +98,11 @@ function onMessage(message: ServerMessage) {
       message.marginFrames
     )
     for (let i = 0; i < message.initialBags.length; ++i) {
-      game.games[i].bag = [...message.initialBags[i]]
+      origin.games[i].bag = [...message.initialBags[i]]
     }
+    mirror = new TimeWarpingMirror(origin, message.initialBags)
+    game = origin.clone(true)
+    lastMove = null
     identity = message.identity as number
     replay.gameSeed = -1
     replay.colorSelection = message.colorSelection
@@ -113,56 +114,81 @@ function onMessage(message: ServerMessage) {
     names[0] = message.metadata.names[identity]
     names[1] = message.metadata.names[1 - identity]
     replay.metadata.names = [...names]
-    if (message.metadata.timeControl) {
-      timers[0] = FischerTimer.fromString(message.metadata.timeControl)
-      timers[1] = FischerTimer.fromString(message.metadata.timeControl)
-    } else {
-      timers[0] = new FischerTimer()
-      timers[1] = new FischerTimer()
-    }
-    moveQueues.forEach((queue) => (queue.length = 0))
-    gameFrameRate.value = 45 / 1000
-    gameType.value = 'pausing'
-    referenceAge = 0
-    referenceTime = null
-    lastTickTime = null
-    lastAgeDrawn = -1
-    opponentPieceTime = null
-    opponentThinkingOpacity.value = 0
     passing.value = false
     justPassed.value = false
     canRequeue.value = false
     timeouts.fill(false)
+    websocket.ready()
+  }
+  if (message.type === 'go') {
+    referenceAge = 0
+    referenceTime = null
+    lastTickTime = null
+    lastAgeDrawn = -1
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
     } else {
       window.clearTimeout(tickId)
       tickId = window.setTimeout(tick, 100)
     }
-    websocket.ready()
   }
   if (message.type === 'piece') {
     message.player = identity ? 1 - message.player : message.player
-    timers[message.player].begin()
-    message.piece.forEach((color) => game!.games[message.player].bag.push(color))
+    mirror!.addPiece(message)
     lastAgeDrawn = -1
-    if (message.player === 1) {
-      opponentPieceTime = performance.now()
-    }
   }
-  if (message.type === 'timer' && message.player !== identity) {
-    timers[1].end()
-    timers[1].remaining = message.msRemaining
-  }
-  if (message.type === 'pausing move') {
+  if (message.type === 'realtime move') {
     message.player = identity ? 1 - message.player : message.player
-    if (message.player === 1 && timers[1].reference !== null) {
-      timers[1].end()
-      timers[1].remaining = message.msRemaining
+    if (message.player === 1) {
+      mirror!.addMove(message)
     }
-    moveQueues[message.player].push(message)
+  }
+  if (message.type === 'retcon') {
+    for (const move of message.rejectedMoves) {
+      move.player = identity ? 1 - move.player : move.player
+      // Retry once
+      if (lastMove && move.player === 0 && move.time === lastMove.time) {
+        lastMove = { ...lastMove }
+        lastMove.time = currentAge
+        if (LOG) {
+          console.log('Retrying last move at current time')
+        }
+        websocket.makeRealtimeMove(
+          lastMove.x1,
+          lastMove.y1,
+          lastMove.orientation,
+          false,
+          lastMove.time
+        )
+        mirror!.addMove(lastMove)
+        lastMove = null
+      }
+    }
+    mirror!.deleteMoves(message.rejectedMoves)
+  }
+  if (message.type === 'piece' || message.type === 'retcon') {
+    const serverTime = message.time
+    if (referenceAge + serverDelta > serverTime + 1) {
+      serverDelta = serverTime - referenceAge
+      if (LOG) {
+        console.log('Preventing advancing, delta =', serverDelta)
+      }
+    }
+    if (referenceAge + serverDelta < serverTime - 5) {
+      serverDelta = serverTime - referenceAge
+      if (LOG) {
+        console.log('Preventing lagging, delta =', serverDelta)
+      }
+    }
   }
   if (message.type === 'game result') {
+    replay.moves.length = 0
+    for (const moves of mirror!.moves) {
+      for (const move of moves) {
+        replay.moves.push(move)
+      }
+    }
+    replay.moves.sort((a, b) => a.time - b.time)
     replay.gameSeed = message.gameSeed
     replay.result.reason = message.reason
     replay.metadata.endTime = message.msSince1970
@@ -190,39 +216,13 @@ function onMessage(message: ServerMessage) {
         timeouts.fill(true)
       }
     }
-    if (LOG) {
-      console.log('Switching to realtime')
-    }
     canRequeue.value = true
-    gameFrameRate.value = 30 / 1000
-    gameType.value = 'realtime'
-    referenceTime = null
-    referenceAge = 0
-    if (game) {
-      // This is basically brain surgery just to keep playing
-      const surrogate = new OnePlayerGame(replay.gameSeed, replay.colorSelection, replay.screenSeed)
-      for (const move of replay.moves) {
-        if (move.player === 0) {
-          surrogate.advanceColors()
-        }
-      }
-      if (LOG) {
-        console.log('Setting surrogate bag', surrogate.bag)
-      }
-      game.games[0].bag = surrogate.bag
-      game.games[0].jkiss = surrogate.jkiss
-    }
-    for (const timer of timers) {
-      if (timer.reference !== null) {
-        timer.end()
-      }
-    }
   }
 }
 
 // Game logic goes here and runs independent of animation.
 function tick() {
-  if (!game) {
+  if (!mirror) {
     return
   }
   const timeStamp = window.performance.now()
@@ -230,36 +230,15 @@ function tick() {
     referenceTime = timeStamp
   }
 
-  for (let i = 0; i < moveQueues.length; ++i) {
-    if (!game.games[i].busy && moveQueues[i].length) {
-      const move = moveQueues[i].shift()!
-      if (move.pass) {
-        passing.value = true
-      } else {
-        passing.value = false
-        const playedMove = game.play(i, move.x1, move.y1, move.orientation)
-        lastAgeDrawn = -1
-        replay.moves.push(playedMove)
-      }
-    }
+  referenceAge = (timeStamp - referenceTime) * FRAME_RATE
+  currentAge = Math.max(0, Math.round(referenceAge + serverDelta))
+  const [g, tickResults] = mirror.warp(currentAge)
+  processTickSounds(audioContext, tickResults)
+  game = g
+  if (game === null && LOG) {
+    console.log('Inconsistent mirror state')
   }
-
-  const intendedAge = (timeStamp - referenceTime) * gameFrameRate.value
-  while (referenceAge < intendedAge) {
-    if (
-      game.games.every((game) => game.busy) ||
-      (passing.value && game.games.some((game) => game.busy)) ||
-      gameType.value === 'realtime'
-    ) {
-      const tickResults = game.tick()
-      if (tickResults.every((r) => !r.busy)) {
-        passing.value = false
-      }
-      processTickSounds(audioContext, tickResults)
-    }
-    referenceAge++
-  }
-  const nextTickTime = referenceAge * msPerFrame.value + referenceTime
+  const nextTickTime = referenceAge * MS_PER_FRAME + referenceTime
   lastTickTime = window.performance.now()
   tickId = window.setTimeout(tick, nextTickTime - lastTickTime)
 }
@@ -268,49 +247,16 @@ function tick() {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function draw(timeStamp: DOMHighResTimeStamp) {
   const drawTime = window.performance.now()
-  if (lastTickTime === null || gameType.value === 'pausing') {
+  if (lastTickTime === null) {
     fallMu.value = 0
-  } else if (gameType.value === 'realtime') {
-    fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * gameFrameRate.value))
+  } else {
+    fallMu.value = Math.max(0, Math.min(1, (drawTime - lastTickTime) * FRAME_RATE))
   }
 
-  if (game !== null && (!gameStates.value || lastAgeDrawn !== game.age)) {
+  if (game !== null && (!gameStates.value || lastAgeDrawn !== currentAge)) {
     gameStates.value = game.state
     chainCards.value = game.deck.chains
-    lastAgeDrawn = game.age
-  }
-
-  const moveReceived = moveQueues[1].length
-  const waitingOnSelf = gameStates.value && !gameStates.value[0].busy
-  const opponentResolving = gameStates.value && gameStates.value[1].busy
-  const gameOver = gameStates.value && gameStates.value.some((s) => s.lockedOut)
-  const realtime = gameType.value === 'realtime'
-
-  // XXX: Fading depends on framerate
-  if (
-    opponentPieceTime === null ||
-    moveReceived ||
-    waitingOnSelf ||
-    opponentResolving ||
-    gameOver ||
-    realtime
-  ) {
-    opponentThinkingOpacity.value *= 0.7
-  } else if (drawTime - opponentPieceTime > 1000) {
-    opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
-  }
-
-  for (let i = 0; i < timers.length; ++i) {
-    timeDangers[i] = timers[i].timeRemaining() < 20000
-    if (timeDangers[i]) {
-      timeDisplays[i] = timers[i].display(1)
-    } else {
-      timeDisplays[i] = timers[i].display()
-    }
-  }
-
-  if (gameType.value === 'pausing' && timers[0].flagged()) {
-    websocket.timeout()
+    lastAgeDrawn = currentAge
   }
 
   frameId = window.requestAnimationFrame(draw)
@@ -318,63 +264,37 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 // User interaction goes here.
 
-const canPass = computed(() =>
-  Boolean(
-    gameStates.value &&
-      !justPassed.value &&
-      !gameStates.value[0].busy &&
-      gameStates.value[1].busy &&
-      gameType.value === 'pausing'
-  )
-)
-
-function pass() {
-  if (!canPass.value) {
-    return
-  }
-  justPassed.value = true
-  if (timers[0].end()) {
-    websocket.timeout()
-  } else {
-    websocket.passMove(timers[0].remaining)
-  }
-}
-
 function requeue() {
   if (canRequeue.value) {
-    websocket.requestGame('pausing')
+    websocket.requestGame('realtime')
   }
 }
 
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
-  if (gameType.value === 'pausing') {
-    if (timers[0].end()) {
-      websocket.timeout()
+  if (game) {
+    const move = game.play(0, x1, y1, orientation, hardDrop)
+    if (replay.gameSeed === -1) {
+      websocket.makeRealtimeMove(move.x1, move.y1, move.orientation, false, move.time)
     } else {
-      websocket.makePausingMove(x1, y1, orientation, hardDrop, timers[0].remaining)
+      replay.moves.push(move)
+      localStorage.setItem('replays.latest', JSON.stringify(replay))
     }
-  } else if (game) {
-    const playedMove = game.play(0, x1, y1, orientation)
-    if (LOG) {
-      console.log('Pushing realtime move', playedMove)
-    }
-    replay.moves.push(playedMove)
-    localStorage.setItem('replays.latest', JSON.stringify(replay))
+    mirror!.addMove(move)
+    lastMove = move
   }
-  justPassed.value = false
 }
 
 // Child props that require access to the game engine
 
 const primaryDropletY = computed(() => {
-  if (!gameStates.value || !playingField.value) {
+  if (!game || !gameStates.value || !playingField.value) {
     return VISIBLE_HEIGHT - 1
   }
   const x1 = playingField.value.x1
   const y1 = playingField.value.y1
   const x2 = playingField.value.x2
   const y2 = playingField.value.y2
-  const bottom = game!.games[0].screen.dropPuyo(x1, y1 + GHOST_Y + 1) - GHOST_Y - 1
+  const bottom = game.games[0].screen.dropPuyo(x1, y1 + GHOST_Y + 1) - GHOST_Y - 1
   if (x1 === x2 && y2 > y1) {
     return bottom - 1
   }
@@ -382,14 +302,14 @@ const primaryDropletY = computed(() => {
 })
 
 const secondaryDropletY = computed(() => {
-  if (!gameStates.value || !playingField.value) {
+  if (!game || !gameStates.value || !playingField.value) {
     return VISIBLE_HEIGHT - 2
   }
   const x1 = playingField.value.x1
   const y1 = playingField.value.y1
   const x2 = playingField.value.x2
   const y2 = playingField.value.y2
-  const bottom = game!.games[0].screen.dropPuyo(x2, y2 + GHOST_Y + 1) - GHOST_Y - 1
+  const bottom = game.games[0].screen.dropPuyo(x2, y2 + GHOST_Y + 1) - GHOST_Y - 1
   if (x1 === x2 && y2 < y1) {
     return bottom - 1
   }
@@ -397,10 +317,10 @@ const secondaryDropletY = computed(() => {
 })
 
 const preIgnitions = computed(() => {
-  if (!gameStates.value || !playingField.value) {
+  if (!game || !gameStates.value || !playingField.value) {
     return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
   }
-  return game!.games[0].screen
+  return game.games[0].screen
     .preIgnite(
       playingField.value.x1,
       primaryDropletY.value + GHOST_Y + 1,
@@ -417,7 +337,7 @@ const preIgnitions = computed(() => {
 onMounted(() => {
   websocket.addMessageListener(onMessage)
   websocket.sendUserData()
-  websocket.requestGame('pausing')
+  websocket.requestGame('realtime')
   canRequeue.value = false
   frameId = window.requestAnimationFrame(draw)
 })
@@ -438,14 +358,13 @@ onUnmounted(() => {
   <main>
     <PlayingField
       ref="playingField"
-      @pass="pass"
       @commit="commitMove"
       :wins="wins"
       :gameStates="gameStates"
       :chainCards="chainCards"
-      :canPass="canPass"
+      :canPass="null"
       :passing="passing"
-      :opponentThinkingOpacity="opponentThinkingOpacity"
+      :opponentThinkingOpacity="0"
       :fallMu="fallMu"
       :justPassed="justPassed"
       :primaryDropletY="primaryDropletY"
@@ -453,8 +372,8 @@ onUnmounted(() => {
       :preIgnitions="preIgnitions"
       :timeouts="timeouts"
       :names="names"
-      :timeDisplays="timeDisplays"
-      :timeDangers="timeDangers"
+      :timeDisplays="['-', '-']"
+      :timeDangers="[false, false]"
     >
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"

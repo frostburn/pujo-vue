@@ -4,17 +4,17 @@ import {
   replayToTrack,
   type Replay,
   type GameState,
-  type TickResult,
   VISIBLE_HEIGHT,
   parseReplay,
-  type TrackItem
+  type TrackItem,
+  type MultiplayerTickResult
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
 import PlayingScreen from '@/components/PlayingScreen.vue'
 import ReplayTrack from '@/components/ReplayTrack.vue'
 import { LEFT_SCREEN_X, RIGHT_SCREEN_X, SCREEN_Y } from '@/util'
-import { ChainDeck } from '@/chain-deck'
+import { ChainDeck, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 
@@ -29,30 +29,24 @@ const serialized = localStorage.getItem('replays.latest')
 
 let replay: Replay | undefined
 
-let game = new MultiplayerGame()
-let deck = new ChainDeck()
+let game = new DeckedGame()
 let replayIndex = 0
 let finalTime = Infinity
 let track: TrackItem[] = []
 
-const snapshots: MultiplayerGame[] = []
-const snapDecks: ChainDeck[] = []
+const snapshots: DeckedGame[] = []
 
-const tempDeck = new ChainDeck()
-function takeSnapshot(g: MultiplayerGame, tickResults: TickResult[]) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function takeSnapshot(g: MultiplayerGame, tickResults: MultiplayerTickResult[]) {
   if (!(g.age % SNAPSHOT_INTERVAL)) {
-    snapshots.push(g.clone(true))
-    snapDecks.push(tempDeck.clone())
-  }
-  if (tickResults.length) {
-    tempDeck.processTick(g, tickResults)
+    snapshots.push(g.clone(true) as DeckedGame)
   }
 }
 
 if (serialized) {
   replay = parseReplay(serialized)
 
-  game = new MultiplayerGame(
+  game = new DeckedGame(
     replay.gameSeed,
     replay.colorSelection,
     replay.screenSeed,
@@ -60,7 +54,7 @@ if (serialized) {
     replay.marginFrames
   )
 
-  track = [...replayToTrack(replay, takeSnapshot)]
+  track = [...replayToTrack(replay, takeSnapshot, DeckedGame)]
 
   finalTime = track[track.length - 1].time
 }
@@ -73,9 +67,9 @@ const time = ref(0)
 const frameRate = ref(0)
 const timeouts = reactive([false, false])
 
-const gameAndDeckStates = computed<[GameState[], TickResult[] | null, ChainDeck]>(() => {
+const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null, ChainDeck]>(() => {
   if (!replay) {
-    return [[], null, deck]
+    return [[], null, new ChainDeck()]
   }
 
   if (time.value < 0) {
@@ -90,14 +84,13 @@ const gameAndDeckStates = computed<[GameState[], TickResult[] | null, ChainDeck]
       }
     }
     game = snapshots[i - 1].clone(true)
-    deck = snapDecks[i - 1].clone()
     replayIndex = 0
     while (replayIndex < replay.moves.length && replay.moves[replayIndex].time < game.age) {
       replayIndex++
     }
   }
 
-  let tickResults: TickResult[] | null = null
+  let tickResults: MultiplayerTickResult[] | null = null
 
   // Fast-forward to the current time
   while (game.age < time.value) {
@@ -106,9 +99,8 @@ const gameAndDeckStates = computed<[GameState[], TickResult[] | null, ChainDeck]
       game.play(move.player, move.x1, move.y1, move.orientation)
     }
     tickResults = game.tick()
-    deck.processTick(game, tickResults)
   }
-  return [game.state, tickResults, deck]
+  return [game.state, tickResults, game.deck]
 })
 
 const gameStates = computed(() => gameAndDeckStates.value[0])

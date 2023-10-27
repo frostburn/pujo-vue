@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "pinia": "^2.1.6",
-    "pujo-puyo-core": "github:frostburn/pujo-puyo-core#realtime",
+    "pujo-puyo-core": "github:frostburn/pujo-puyo-core",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4"
   },

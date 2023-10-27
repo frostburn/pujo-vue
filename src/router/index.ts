@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('../views/OnlineView.vue')
     },
     {
+      path: '/play-realtime',
+      name: 'play-realtime',
+      component: () => import('../views/RealtimeView.vue')
+    },
+    {
       path: '/play-cpu',
       name: 'play-cpu',
       component: () => import('../views/LocalView.vue')
