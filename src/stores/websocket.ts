@@ -129,7 +129,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.sendMessage({ type: 'move', x1, y1, pass: false, orientation, hardDrop, msRemaining })
+    socket.sendMessage({ type: 'pausing move', x1, y1, pass: false, orientation, hardDrop, msRemaining })
   }
 
   function passMove(msRemaining: number) {
@@ -137,7 +137,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.sendMessage({ type: 'move', pass: true, msRemaining })
+    socket.sendMessage({ type: 'pausing move', pass: true, msRemaining })
   }
 
   function timeout() {

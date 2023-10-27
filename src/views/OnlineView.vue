@@ -18,7 +18,7 @@ import {
 } from 'pujo-puyo-core'
 import { ChainDeck, type Chain } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
-import type { ServerMessage, ServerMoveMessage } from '@/server-api'
+import type { ServerMessage, ServerPausingMove } from '@/server-api'
 
 // === Constants ===
 
@@ -29,9 +29,8 @@ const LOG = import.meta.env.DEV;
 // Server connection
 const websocket = useWebSocketStore()
 let identity: number | null = null
-let opponentBagTime: DOMHighResTimeStamp | null = null
-const bagQueues: number[][][] = [[], []]
-const moveQueues: ServerMoveMessage[][] = [[], []]
+let opponentPieceTime: DOMHighResTimeStamp | null = null
+const moveQueues: ServerPausingMove[][] = [[], []]
 
 const audioContext = useAudioContextStore()
 
@@ -102,6 +101,9 @@ function onMessage(message: ServerMessage) {
       message.targetPoints,
       message.marginFrames
     )
+    for (let i = 0; i < message.initialBags.length; ++i) {
+      game.games[i].bag = [...message.initialBags[i]];
+    }
     identity = message.identity as number
     replay.gameSeed = -1
     replay.colorSelection = message.colorSelection
@@ -120,7 +122,6 @@ function onMessage(message: ServerMessage) {
       timers[0] = new FischerTimer()
       timers[1] = new FischerTimer()
     }
-    bagQueues.forEach((queue) => (queue.length = 0))
     moveQueues.forEach((queue) => (queue.length = 0))
     gameFrameRate.value = 45 / 1000
     gameType.value = 'pausing'
@@ -128,7 +129,7 @@ function onMessage(message: ServerMessage) {
     referenceTime = null
     lastTickTime = null
     lastAgeDrawn = -1
-    opponentBagTime = null
+    opponentPieceTime = null
     chainDeck = new ChainDeck()
     opponentThinkingOpacity.value = 0
     passing.value = false
@@ -142,26 +143,20 @@ function onMessage(message: ServerMessage) {
       tickId = window.setTimeout(tick, 100)
     }
   }
-  if (message.type === 'bag') {
+  if (message.type === 'piece') {
     message.player = identity ? 1 - message.player : message.player
     timers[message.player].begin()
-    bagQueues[message.player].push(message.bag)
-    if (game!.games[message.player].bag.length < 6) {
-      game!.games[message.player].bag = [...message.bag]
-      lastAgeDrawn = -1
-      if (LOG) {
-        console.log(`Setting bag of ${message.player} from message`)
-      }
-    }
+    message.piece.forEach(color => game!.games[message.player].bag.push(color))
+    lastAgeDrawn = -1
     if (message.player === 1) {
-      opponentBagTime = performance.now()
+      opponentPieceTime = performance.now()
     }
   }
   if (message.type === 'timer' && message.player !== identity) {
     timers[1].end()
     timers[1].remaining = message.msRemaining
   }
-  if (message.type === 'move') {
+  if (message.type === 'pausing move') {
     message.player = identity ? 1 - message.player : message.player
     if (message.player === 1 && timers[1].reference !== null) {
       timers[1].end()
@@ -238,26 +233,13 @@ function tick() {
   for (let i = 0; i < moveQueues.length; ++i) {
     if (!game.games[i].busy && moveQueues[i].length) {
       const move = moveQueues[i].shift()!
-      const bag = bagQueues[i].shift()
-      if (bag === undefined) {
-        throw new Error('Bag queue desync')
-      }
       if (move.pass) {
         passing.value = true
       } else {
         passing.value = false
-        game.games[i].bag = bag
-        const playedMove = game.play(i, move.x1, move.y1, move.orientation, move.hardDrop)
+        const playedMove = game.play(i, move.x1, move.y1, move.orientation)
         lastAgeDrawn = -1
         replay.moves.push(playedMove)
-
-        if (game.games[i].bag.length < 6 && bagQueues[i].length) {
-          if (LOG) {
-            console.log(`Setting bag of ${i} from queue`)
-          }
-          game.games[i].bag = [...bagQueues[i][0]]
-          lastAgeDrawn = -1
-        }
       }
     }
   }
@@ -307,7 +289,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
   // XXX: Fading depends on framerate
   if (
-    opponentBagTime === null ||
+    opponentPieceTime === null ||
     moveReceived ||
     waitingOnSelf ||
     opponentResolving ||
@@ -315,7 +297,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     realtime
   ) {
     opponentThinkingOpacity.value *= 0.7
-  } else if (drawTime - opponentBagTime > 1000) {
+  } else if (drawTime - opponentPieceTime > 1000) {
     opponentThinkingOpacity.value = 1 - (1 - opponentThinkingOpacity.value) * 0.995
   }
 

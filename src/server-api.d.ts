@@ -1,130 +1,159 @@
 import {
   type Replay,
   type ApplicationInfo,
+  type RevealedPiece,
   ReplayMetadata,
   ReplayResult,
-  SimpleGame
-} from 'pujo-puyo-core'
+  SimpleGame,
+  PlayedMove,
+} from 'pujo-puyo-core';
 
-// TODO: Move to a third repository as co-dependency of pujo-ws-server and pujo-vue.
+type GameType = Replay['metadata']['type'];
 
-type GameType = Replay['metadata']['type']
+type PausingMoveBase = {
+  type: 'pausing move';
+  x1: number;
+  y1: number;
+  hardDrop: boolean;
+  pass: false;
+  msRemaining: number;
+};
 
-type NormalMove = {
-  type: 'move'
-  x1: number
-  y1: number
-  hardDrop: boolean
-  pass: false
-  msRemaining: number
+interface OrientedPausingMove extends PausingMoveBase {
+  orientation: number;
 }
 
-interface OrientedMove extends NormalMove {
-  orientation: number
-}
-
-interface CoordinatedMove extends NormalMove {
-  orientation: undefined
-  x2: number
-  y2: number
+interface CoordinatedPausingMove extends PausingMoveBase {
+  orientation: undefined;
+  x2: number;
+  y2: number;
 }
 
 type PassingMove = {
-  type: 'move'
-  pass: true
-  msRemaining: number
+  type: 'pausing move';
+  pass: true;
+  msRemaining: number;
+};
+
+type PausingMove = OrientedPausingMove | CoordinatedPausingMove | PassingMove;
+
+interface RealtimeMoveBase {
+  type: 'realtime move';
+  x1: number;
+  y1: number;
+  hardDrop: boolean;
+  time?: number;
 }
 
-type MoveMessage = OrientedMove | CoordinatedMove | PassingMove
+interface OrientedRealtimeMove extends RealtimeMoveBase {
+  orientation: number;
+}
+
+interface CoordinatedRealtimeMove extends RealtimeMoveBase {
+  orientation: undefined;
+  x2: number;
+  y2: number;
+}
+
+type RealtimeMove = OrientedRealtimeMove | CoordinatedRealtimeMove;
 
 // Incoming (server's perspective)
 
 type GameRequest = {
-  type: 'game request'
-  gameType: GameType
-}
+  type: 'game request';
+  gameType: GameType;
+};
 
 type UserMessage = {
-  type: 'user'
-  username?: string
-  clientInfo?: ApplicationInfo
-  authUuid?: string
-  socketId?: number
-}
+  type: 'user';
+  username?: string;
+  clientInfo?: ApplicationInfo;
+  authUuid?: string;
+  socketId?: number;
+};
 
 type SimpleStateRequest = {
-  type: 'simple state request'
-}
+  type: 'simple state request';
+};
 
 type ResultMessage = {
-  type: 'result'
-  reason: 'resignation' | 'timeout'
-}
+  type: 'result';
+  reason: 'resignation' | 'timeout';
+};
 
-type ClientMessage = GameRequest | UserMessage | SimpleStateRequest | ResultMessage | MoveMessage
+type ClientMessage =
+  | GameRequest
+  | UserMessage
+  | SimpleStateRequest
+  | ResultMessage
+  | PausingMove
+  | RealtimeMove;
 
 // Outgoing (server's perspective)
 
-interface ServerNormalMove extends NormalMove {
-  player: number
-  x2: number
-  y2: number
-  orientation: number
+interface ServerPausingNormalMove extends PlayedMove {
+  type: 'pausing move';
+  pass: false;
+  msRemaining: number;
 }
 
 interface ServerPassingMove extends PassingMove {
-  player: number
+  player: number;
 }
 
-type ServerMoveMessage = ServerNormalMove | ServerPassingMove
+type ServerPausingMove = ServerPausingNormalMove | ServerPassingMove;
+
+interface ServerRealtimeMove extends PlayedMove {
+  type: 'realtime move';
+}
 
 type GameParams = {
-  type: 'game params'
-  colorSelection: Replay['colorSelection']
-  screenSeed: Replay['screenSeed']
-  targetPoints: Replay['targetPoints']
-  marginFrames: Replay['marginFrames']
-  identity: number
-  metadata: ReplayMetadata
-}
+  type: 'game params';
+  colorSelection: Replay['colorSelection'];
+  screenSeed: Replay['screenSeed'];
+  targetPoints: Replay['targetPoints'];
+  marginFrames: Replay['marginFrames'];
+  initialBags: number[][];
+  identity: number;
+  metadata: ReplayMetadata;
+};
 
-type BagMessage = {
-  type: 'bag'
-  player: number
-  bag: number[]
+interface PieceMessage extends RevealedPiece {
+  type: 'piece';
 }
 
 type GameResult = {
-  type: 'game result'
-  winner: ReplayResult['winner']
-  reason: ReplayResult['reason']
-  msSince1970: ReplayMetadata['endTime']
-  gameSeed: Replay['gameSeed']
-}
+  type: 'game result';
+  winner: ReplayResult['winner'];
+  reason: ReplayResult['reason'];
+  msSince1970: ReplayMetadata['endTime'];
+  gameSeed: Replay['gameSeed'];
+};
 
 type SimpleState = {
-  type: 'simple state'
-  state: SimpleGame
-}
+  type: 'simple state';
+  state: SimpleGame;
+};
 
 type TimerMessage = {
-  type: 'timer'
-  player: number
-  msRemaining: number
-}
+  type: 'timer';
+  player: number;
+  msRemaining: number;
+};
 
 type ServerUserMessage = {
-  type: 'user'
-  username: string
-  eloRealtime: number
-  eloPausing: number
-}
+  type: 'user';
+  username: string;
+  eloRealtime: number;
+  eloPausing: number;
+};
 
 type ServerMessage =
   | GameParams
-  | BagMessage
+  | PieceMessage
   | GameResult
   | SimpleState
   | TimerMessage
-  | ServerMoveMessage
-  | ServerUserMessage
+  | ServerPausingMove
+  | ServerRealtimeMove
+  | ServerUserMessage;
