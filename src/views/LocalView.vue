@@ -94,16 +94,26 @@ let workerThrottleRemaining = difficulty.value.throttleFrames
 let lastAgeDrawn = -1
 let gameSeed = randomSeed()
 let colorSelection = randomColorSelection()
+let colorSelections = [colorSelection, colorSelection]
 let screenSeed = randomSeed()
 const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
 const marginFrames = Infinity
-let game = new DeckedGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
+const mercyFrames = Infinity
+let game = new DeckedGame(
+  gameSeed,
+  screenSeed,
+  colorSelections,
+  targetPoints,
+  marginFrames,
+  mercyFrames
+)
 const replay: Replay = {
   gameSeed,
   screenSeed,
-  colorSelection,
+  colorSelections,
   targetPoints,
   marginFrames,
+  mercyFrames,
   moves: [],
   metadata: {
     event: 'Local Play vs. CPU',
@@ -342,11 +352,19 @@ function restart() {
   lastAgeDrawn = -1
   gameSeed = randomSeed()
   colorSelection = randomColorSelection()
+  colorSelections = [colorSelection, colorSelection]
   screenSeed = randomSeed()
-  game = new DeckedGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
+  game = new DeckedGame(
+    gameSeed,
+    screenSeed,
+    colorSelections,
+    targetPoints,
+    marginFrames,
+    mercyFrames
+  )
   replay.gameSeed = gameSeed
   replay.screenSeed = screenSeed
-  replay.colorSelection = colorSelection
+  replay.colorSelections = colorSelections
   replay.moves.length = 0
   replay.metadata.priorWins = [...wins]
   replay.metadata.round++

@@ -114,10 +114,11 @@ interface ServerRealtimeMove extends PlayedMove {
 
 type GameParams = {
   type: 'game params'
-  colorSelection: Replay['colorSelection']
+  colorSelections: Replay['colorSelections']
   screenSeed: Replay['screenSeed']
   targetPoints: Replay['targetPoints']
   marginFrames: Replay['marginFrames']
+  mercyFrames: Replay['mercyFrames']
   initialBags: number[][]
   identity: number
   metadata: ReplayMetadata

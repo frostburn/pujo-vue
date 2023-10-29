@@ -2,9 +2,10 @@ import {
   WIDTH,
   type GameState,
   MultiplayerGame,
-  type TickResult,
   GHOST_Y,
-  DEFAULT_MARGIN_FRAMES
+  DEFAULT_MARGIN_FRAMES,
+  DEFAULT_MERCY_FRAMES,
+  type MultiplayerTickResult
 } from 'pujo-puyo-core'
 
 export type Chain = {
@@ -35,7 +36,7 @@ export class ChainDeck {
     return result
   }
 
-  processTick(game: MultiplayerGame, tickResults: TickResult[]) {
+  processTick(game: MultiplayerGame, tickResults: MultiplayerTickResult[]) {
     for (let i = 0; i < this.chains.length; ++i) {
       for (const chain of this.chains[i]) {
         chain.age++
@@ -83,12 +84,13 @@ export class DeckedGame extends MultiplayerGame {
 
   constructor(
     seed?: number | null,
-    colorSelection?: number[],
     screenSeed?: number,
+    colorSelections?: number[][],
     targetPoints?: number[],
-    marginFrames = DEFAULT_MARGIN_FRAMES
+    marginFrames = DEFAULT_MARGIN_FRAMES,
+    mercyFrames = DEFAULT_MERCY_FRAMES
   ) {
-    super(seed, colorSelection, screenSeed, targetPoints, marginFrames)
+    super(seed, screenSeed, colorSelections, targetPoints, marginFrames, mercyFrames)
     this.deck = new ChainDeck()
   }
 

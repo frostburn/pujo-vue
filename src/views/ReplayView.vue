@@ -48,8 +48,8 @@ if (serialized) {
 
   game = new DeckedGame(
     replay.gameSeed,
-    replay.colorSelection,
     replay.screenSeed,
+    replay.colorSelections,
     replay.targetPoints,
     replay.marginFrames
   )

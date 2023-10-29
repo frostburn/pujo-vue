@@ -13,7 +13,8 @@ import {
   FischerTimer,
   OnePlayerGame,
   DEFAULT_TARGET_POINTS,
-  DEFAULT_MARGIN_FRAMES
+  DEFAULT_MARGIN_FRAMES,
+  DEFAULT_MERCY_FRAMES
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -42,9 +43,10 @@ let game: DeckedGame | null = null
 const replay: Replay = {
   gameSeed: -1,
   screenSeed: -1,
-  colorSelection: [],
+  colorSelections: [[], []],
   targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
   marginFrames: DEFAULT_MARGIN_FRAMES,
+  mercyFrames: DEFAULT_MERCY_FRAMES,
   moves: [],
   metadata: {
     event: '',
@@ -94,20 +96,22 @@ function onMessage(message: ServerMessage) {
   if (message.type === 'game params') {
     game = new DeckedGame(
       null,
-      message.colorSelection,
       message.screenSeed,
+      message.colorSelections,
       message.targetPoints,
-      message.marginFrames
+      message.marginFrames,
+      message.mercyFrames
     )
     for (let i = 0; i < message.initialBags.length; ++i) {
       game.games[i].bag = [...message.initialBags[i]]
     }
     identity = message.identity as number
     replay.gameSeed = -1
-    replay.colorSelection = message.colorSelection
+    replay.colorSelections = message.colorSelections
     replay.screenSeed = message.screenSeed
     replay.targetPoints = message.targetPoints
     replay.marginFrames = message.marginFrames
+    replay.mercyFrames = message.mercyFrames
     replay.moves.length = 0
     replay.metadata = message.metadata
     names[0] = message.metadata.names[identity]
@@ -200,7 +204,11 @@ function onMessage(message: ServerMessage) {
     referenceAge = 0
     if (game) {
       // This is basically brain surgery just to keep playing
-      const surrogate = new OnePlayerGame(replay.gameSeed, replay.colorSelection, replay.screenSeed)
+      const surrogate = new OnePlayerGame(
+        replay.gameSeed,
+        replay.screenSeed,
+        replay.colorSelections[0]
+      )
       for (const move of replay.moves) {
         if (move.player === 0) {
           surrogate.advanceColors()

@@ -13,7 +13,8 @@ import {
   DEFAULT_MARGIN_FRAMES,
   NOMINAL_FRAME_RATE,
   TimeWarpingMirror,
-  type PlayedMove
+  type PlayedMove,
+  DEFAULT_MERCY_FRAMES
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import type { ServerMessage } from '@/server-api'
@@ -23,6 +24,9 @@ import { useAudioContextStore } from '@/stores/audio-context'
 // === Constants ===
 
 const LOG = import.meta.env.DEV
+
+const CHECKPOINT_INTERVAL = 5
+const MAX_CHECKPOINTS = 32
 
 // === State ===
 
@@ -42,9 +46,10 @@ let lastMove: PlayedMove | null = null
 const replay: Replay = {
   gameSeed: -1,
   screenSeed: -1,
-  colorSelection: [],
+  colorSelections: [[], []],
   targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
   marginFrames: DEFAULT_MARGIN_FRAMES,
+  mercyFrames: DEFAULT_MERCY_FRAMES,
   moves: [],
   metadata: {
     event: '',
@@ -92,23 +97,30 @@ function onMessage(message: ServerMessage) {
   if (message.type === 'game params') {
     const origin = new DeckedGame(
       null,
-      message.colorSelection,
       message.screenSeed,
+      message.colorSelections,
       message.targetPoints,
-      message.marginFrames
+      message.marginFrames,
+      message.mercyFrames
     )
     for (let i = 0; i < message.initialBags.length; ++i) {
       origin.games[i].bag = [...message.initialBags[i]]
     }
-    mirror = new TimeWarpingMirror(origin, message.initialBags)
+    mirror = new TimeWarpingMirror(
+      origin,
+      message.initialBags,
+      CHECKPOINT_INTERVAL,
+      MAX_CHECKPOINTS
+    )
     game = origin.clone(true)
     lastMove = null
     identity = message.identity as number
     replay.gameSeed = -1
-    replay.colorSelection = message.colorSelection
+    replay.colorSelections = message.colorSelections
     replay.screenSeed = message.screenSeed
     replay.targetPoints = message.targetPoints
     replay.marginFrames = message.marginFrames
+    replay.mercyFrames = message.mercyFrames
     replay.moves.length = 0
     replay.metadata = message.metadata
     names[0] = message.metadata.names[identity]
