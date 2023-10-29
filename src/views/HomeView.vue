@@ -15,13 +15,13 @@ watch(name, (newValue) => localStorage.setItem('name', newValue))
     <p>Things are a still a bit rough around here...</p>
     <p>Missing features include:</p>
     <ul>
-      <li>Realtime online play</li>
       <li>Proper online matchmaking</li>
       <li>Private matchmaking</li>
       <li>Online profiles and ranking</li>
       <li>Storing more than the latest replay</li>
-      <li>Smartphone support (responsive design)</li>
+      <li>Portrait layout for smartphones</li>
       <li>Classic (gravity-based) interface</li>
+      <li>More intuitive touch interface</li>
       <li>Layout tweaks</li>
     </ul>
     <p>Thank you for your patience!</p>
@@ -29,6 +29,9 @@ watch(name, (newValue) => localStorage.setItem('name', newValue))
     <p>
       It's recommended to use the mouse. Click on the playing field to lock in the primary panel and
       orbit the secondary panel in place before releasing the mouse button to commit the move.
+    </p>
+    <p>
+      The touch interface emulates the mouse. It's a little stiff. Better one is being designed.
     </p>
     <p>
       You can also move the cursor with <b>W,A,S,D</b> or the <b>Arrow Keys</b>. Lock the primary
