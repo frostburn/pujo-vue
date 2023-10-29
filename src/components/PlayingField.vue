@@ -27,7 +27,6 @@ const props = defineProps<{
   passing: boolean
   fallMu: number
   opponentThinkingOpacity: number
-  justPassed: boolean
   primaryDropletY: number
   secondaryDropletY: number
   preIgnitions: boolean[]

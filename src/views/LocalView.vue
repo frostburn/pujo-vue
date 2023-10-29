@@ -411,7 +411,6 @@ onUnmounted(() => {
       :passing="false"
       :opponentThinkingOpacity="0"
       :fallMu="fallMu"
-      :justPassed="false"
       :primaryDropletY="primaryDropletY"
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"

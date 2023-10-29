@@ -63,7 +63,7 @@ const replay: Replay = {
   }
 }
 let timers = [new FischerTimer(), new FischerTimer()]
-const passing = ref(false)
+const passing = reactive([false, false])
 const justPassed = ref(false)
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
@@ -91,7 +91,7 @@ const playingField = ref<typeof PlayingField | null>(null)
 
 function onMessage(message: ServerMessage) {
   if (LOG) {
-    console.log(message)
+    console.log(message, identity)
   }
   if (message.type === 'game params') {
     game = new DeckedGame(
@@ -133,7 +133,7 @@ function onMessage(message: ServerMessage) {
     lastAgeDrawn = -1
     opponentPieceTime = null
     opponentThinkingOpacity.value = 0
-    passing.value = false
+    passing.fill(false)
     justPassed.value = false
     canRequeue.value = false
     timeouts.fill(false)
@@ -239,12 +239,11 @@ function tick() {
   }
 
   for (let i = 0; i < moveQueues.length; ++i) {
-    if (!game.games[i].busy && moveQueues[i].length) {
+    if (!passing[i] && !game.games[i].busy && moveQueues[i].length) {
       const move = moveQueues[i].shift()!
       if (move.pass) {
-        passing.value = true
+        passing[i] = true
       } else {
-        passing.value = false
         const playedMove = game.play(i, move.x1, move.y1, move.orientation)
         lastAgeDrawn = -1
         replay.moves.push(playedMove)
@@ -256,12 +255,12 @@ function tick() {
   while (referenceAge < intendedAge) {
     if (
       game.games.every((game) => game.busy) ||
-      (passing.value && game.games.some((game) => game.busy)) ||
+      (passing.some(Boolean) && game.games.some((game) => game.busy)) ||
       gameType.value === 'realtime'
     ) {
       const tickResults = game.tick()
       if (tickResults.every((r) => !r.busy)) {
-        passing.value = false
+        passing.fill(false)
       }
       processTickSounds(audioContext, tickResults)
     }
@@ -452,10 +451,9 @@ onUnmounted(() => {
       :gameStates="gameStates"
       :chainCards="chainCards"
       :canPass="canPass"
-      :passing="passing"
+      :passing="passing[0]"
       :opponentThinkingOpacity="opponentThinkingOpacity"
       :fallMu="fallMu"
-      :justPassed="justPassed"
       :primaryDropletY="primaryDropletY"
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"

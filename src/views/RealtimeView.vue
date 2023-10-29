@@ -65,8 +65,6 @@ const replay: Replay = {
     reason: 'ongoing'
   }
 }
-const passing = ref(false)
-const justPassed = ref(false)
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
 const timeouts = reactive([false, false])
@@ -92,7 +90,7 @@ const playingField = ref<typeof PlayingField | null>(null)
 
 function onMessage(message: ServerMessage) {
   if (LOG) {
-    console.log(message)
+    console.log(message, identity)
   }
   if (message.type === 'game params') {
     const origin = new DeckedGame(
@@ -126,8 +124,6 @@ function onMessage(message: ServerMessage) {
     names[0] = message.metadata.names[identity]
     names[1] = message.metadata.names[1 - identity]
     replay.metadata.names = [...names]
-    passing.value = false
-    justPassed.value = false
     canRequeue.value = false
     timeouts.fill(false)
     websocket.ready()
@@ -375,10 +371,10 @@ onUnmounted(() => {
       :gameStates="gameStates"
       :chainCards="chainCards"
       :canPass="null"
-      :passing="passing"
+      :passing="false"
       :opponentThinkingOpacity="0"
       :fallMu="fallMu"
-      :justPassed="justPassed"
+      :justPassed="false"
       :primaryDropletY="primaryDropletY"
       :secondaryDropletY="secondaryDropletY"
       :preIgnitions="preIgnitions"
