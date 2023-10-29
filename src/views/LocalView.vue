@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ChainDeck, type Chain } from '@/chain-deck'
+import { type Chain, DeckedGame } from '@/chain-deck'
 import PlayingField from '@/components/PlayingField.vue'
 import PlayingButton from '@/components/PlayingButton.vue'
 import {
   MOVES,
-  MultiplayerGame,
   randomColorSelection,
   randomSeed,
   type GameState,
@@ -98,8 +97,7 @@ let colorSelection = randomColorSelection()
 let screenSeed = randomSeed()
 const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
 const marginFrames = Infinity
-let game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
-let chainDeck = new ChainDeck()
+let game = new DeckedGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
 const replay: Replay = {
   gameSeed,
   screenSeed,
@@ -186,7 +184,6 @@ function tick() {
   const intendedAge = (timeStamp - referenceTime) * FRAME_RATE
   while (referenceAge < intendedAge) {
     const tickResults = game.tick()
-    chainDeck.processTick(game, tickResults)
     processTickSounds(audioContext, tickResults)
 
     if (!gameOver.value && tickResults.some((t) => t.lockedOut)) {
@@ -264,7 +261,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
   if (lastAgeDrawn !== game.age) {
     gameStates.value = game.state
-    chainCards.value = chainDeck.chains
+    chainCards.value = game.deck.chains
     lastAgeDrawn = game.age
   }
 
@@ -346,8 +343,7 @@ function restart() {
   gameSeed = randomSeed()
   colorSelection = randomColorSelection()
   screenSeed = randomSeed()
-  game = new MultiplayerGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
-  chainDeck = new ChainDeck()
+  game = new DeckedGame(gameSeed, colorSelection, screenSeed, targetPoints, marginFrames)
   replay.gameSeed = gameSeed
   replay.screenSeed = screenSeed
   replay.colorSelection = colorSelection

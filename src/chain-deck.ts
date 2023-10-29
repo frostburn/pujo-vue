@@ -1,9 +1,10 @@
 import {
   WIDTH,
   type GameState,
-  type MultiplayerGame,
+  MultiplayerGame,
   type TickResult,
-  GHOST_Y
+  GHOST_Y,
+  DEFAULT_MARGIN_FRAMES
 } from 'pujo-puyo-core'
 
 export type Chain = {
@@ -74,5 +75,32 @@ export class ChainDeck {
         })
       }
     }
+  }
+}
+
+export class DeckedGame extends MultiplayerGame {
+  deck: ChainDeck
+
+  constructor(
+    seed?: number | null,
+    colorSelection?: number[],
+    screenSeed?: number,
+    targetPoints?: number[],
+    marginFrames = DEFAULT_MARGIN_FRAMES
+  ) {
+    super(seed, colorSelection, screenSeed, targetPoints, marginFrames)
+    this.deck = new ChainDeck()
+  }
+
+  tick() {
+    const results = super.tick()
+    this.deck.processTick(this, results)
+    return results
+  }
+
+  clone(preserveSeed = false) {
+    const result = super.clone(preserveSeed)
+    result.deck = this.deck.clone()
+    return result
   }
 }

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getClientInfo } from '@/util'
-import type { ClientMessage, ServerMessage } from '@/server-api'
+import type { ClientMessage, GameType, ServerMessage } from '@/server-api'
 
 type OpenListener = () => void
 type MessageListener = (message: ServerMessage) => void
@@ -58,26 +58,34 @@ export const useWebSocketStore = defineStore('websocket', () => {
     return false
   }
 
-  function sendGameRequest(socket: ClientSocket) {
+  function sendGameRequest(socket: ClientSocket, gameType: GameType) {
     socket.sendMessage({
       type: 'game request',
-      gameType: 'pausing'
+      gameType
     })
   }
 
-  function requestGame() {
+  function requestGame(gameType: GameType) {
     if (guard(false)) {
       // eslint-disable-next-line no-inner-declarations
       function requestOnOpen() {
         const socket = webSocket.value!
-        sendGameRequest(socket)
+        sendGameRequest(socket, gameType)
         removeOpenListener(requestOnOpen)
       }
       addOpenListener(requestOnOpen)
       return
     }
     const socket = webSocket.value!
-    sendGameRequest(socket)
+    sendGameRequest(socket, gameType)
+  }
+
+  function ready() {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.sendMessage({ type: 'ready' })
   }
 
   function _sendUserData(socket: ClientSocket) {
@@ -118,7 +126,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.sendMessage({ type: 'simple state request' })
   }
 
-  function makeMove(
+  function makePausingMove(
     x1: number,
     y1: number,
     orientation: number,
@@ -129,7 +137,15 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.sendMessage({ type: 'move', x1, y1, pass: false, orientation, hardDrop, msRemaining })
+    socket.sendMessage({
+      type: 'pausing move',
+      x1,
+      y1,
+      pass: false,
+      orientation,
+      hardDrop,
+      msRemaining
+    })
   }
 
   function passMove(msRemaining: number) {
@@ -137,7 +153,21 @@ export const useWebSocketStore = defineStore('websocket', () => {
       return
     }
     const socket = webSocket.value!
-    socket.sendMessage({ type: 'move', pass: true, msRemaining })
+    socket.sendMessage({ type: 'pausing move', pass: true, msRemaining })
+  }
+
+  function makeRealtimeMove(
+    x1: number,
+    y1: number,
+    orientation: number,
+    hardDrop: boolean,
+    time: number | undefined
+  ) {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.sendMessage({ type: 'realtime move', x1, y1, orientation, hardDrop, time })
   }
 
   function timeout() {
@@ -176,10 +206,12 @@ export const useWebSocketStore = defineStore('websocket', () => {
     assign,
     unassign,
     requestGame,
+    ready,
     sendUserData,
     requestState,
-    makeMove,
+    makePausingMove,
     passMove,
+    makeRealtimeMove,
     timeout,
     resign,
     addOpenListener,

@@ -50,6 +50,7 @@ onUnmounted(() => {
     <RouterLink to="/">Home</RouterLink>
     <RouterLink to="/about">About</RouterLink>
     <RouterLink to="/play-online">Play Online</RouterLink>
+    <RouterLink to="/play-realtime">Play Realtime</RouterLink>
     <RouterLink to="/play-cpu">Play CPU</RouterLink>
     <RouterLink to="/replay">Replay</RouterLink>
   </nav>
