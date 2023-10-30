@@ -14,7 +14,8 @@ import {
   NOMINAL_FRAME_RATE,
   TimeWarpingMirror,
   type PlayedMove,
-  DEFAULT_MERCY_FRAMES
+  DEFAULT_MERCY_FRAMES,
+  OnePlayerGame
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import type { ServerMessage } from '@/server-api'
@@ -42,6 +43,7 @@ const MS_PER_FRAME = 1 / FRAME_RATE
 // Engine: A mirror driven by the server.
 let mirror: TimeWarpingMirror<DeckedGame> | null = null
 let game: DeckedGame | null = null
+let surrogate: OnePlayerGame | null = null
 let lastMove: PlayedMove | null = null
 const replay: Replay = {
   gameSeed: -1,
@@ -93,10 +95,13 @@ function onMessage(message: ServerMessage) {
     console.log(message, identity)
   }
   if (message.type === 'game params') {
+    // TODO: Remember to swap everything here and in OnlineView
+    const c = message.colorSelections
+    const colorSelections = identity ? [c[1], c[0]] : c
     const origin = new DeckedGame(
       null,
       message.screenSeed,
-      message.colorSelections,
+      colorSelections,
       message.targetPoints,
       message.marginFrames,
       message.mercyFrames
@@ -114,7 +119,7 @@ function onMessage(message: ServerMessage) {
     lastMove = null
     identity = message.identity as number
     replay.gameSeed = -1
-    replay.colorSelections = message.colorSelections
+    replay.colorSelections = colorSelections
     replay.screenSeed = message.screenSeed
     replay.targetPoints = message.targetPoints
     replay.marginFrames = message.marginFrames
@@ -225,6 +230,15 @@ function onMessage(message: ServerMessage) {
       }
     }
     canRequeue.value = true
+    // Construct a virtual server to keep playing
+    surrogate = new OnePlayerGame(replay.gameSeed, replay.screenSeed, replay.colorSelections[0])
+    mirror!.bags[0] = surrogate.initialBag
+    for (const move of replay.moves) {
+      if (move.player === 0) {
+        mirror!.addPiece({ player: 0, time: move.time, piece: surrogate.nextPiece })
+        surrogate.advanceColors()
+      }
+    }
   }
 }
 
@@ -286,6 +300,9 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
     } else {
       replay.moves.push(move)
       localStorage.setItem('replays.latest', JSON.stringify(replay))
+
+      mirror!.addPiece({ player: 0, time: NaN, piece: surrogate!.nextPiece })
+      surrogate!.advanceColors()
     }
     mirror!.addMove(move)
     lastMove = move
