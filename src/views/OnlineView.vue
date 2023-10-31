@@ -37,7 +37,7 @@ onMounted(() => {
   }
   websocket.sendUserData()
   websocket.listChallenges()
-  pollId.value = setInterval(pollChallenges, 500)
+  pollId.value = window.setInterval(pollChallenges, 500)
 })
 
 onUnmounted(() => {
@@ -45,7 +45,7 @@ onUnmounted(() => {
     websocket.clientSocket.removeMessageListener(onMessage)
   }
   if (pollId.value) {
-    clearInterval(pollId.value)
+    window.clearInterval(pollId.value)
   }
 })
 </script>
