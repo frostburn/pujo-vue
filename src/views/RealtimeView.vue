@@ -34,6 +34,7 @@ const MAX_CHECKPOINTS = 32
 
 // Router
 const route = useRoute()
+const botsAllowed = route.query.b !== '0'
 
 // Server connection
 const websocket = useWebSocketStore()
@@ -292,7 +293,7 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 function requeue() {
   if (canRequeue.value) {
-    websocket.requestGame('realtime')
+    websocket.requestGame('realtime', botsAllowed)
   }
 }
 
@@ -373,7 +374,7 @@ onMounted(() => {
   if (route.params.uuid) {
     websocket.acceptChallenge(route.params.uuid as string)
   } else {
-    websocket.requestGame('realtime')
+    websocket.requestGame('realtime', botsAllowed)
   }
   canRequeue.value = false
   frameId = window.requestAnimationFrame(draw)

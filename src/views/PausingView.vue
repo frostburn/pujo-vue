@@ -29,6 +29,7 @@ const LOG = import.meta.env.DEV
 
 // Router
 const route = useRoute()
+const botsAllowed = route.query.b !== '0'
 
 // Server connection
 const websocket = useWebSocketStore()
@@ -353,7 +354,7 @@ function pass() {
 
 function requeue() {
   if (canRequeue.value) {
-    websocket.requestGame('pausing')
+    websocket.requestGame('pausing', botsAllowed)
   }
 }
 
@@ -435,7 +436,7 @@ onMounted(() => {
   if (route.params.uuid) {
     websocket.acceptChallenge(route.params.uuid as string)
   } else {
-    websocket.requestGame('pausing')
+    websocket.requestGame('pausing', botsAllowed)
   }
   canRequeue.value = false
   frameId = window.requestAnimationFrame(draw)

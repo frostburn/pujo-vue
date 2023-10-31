@@ -7,6 +7,8 @@ const LOG = import.meta.env.DEV
 
 const websocket = useWebSocketStore()
 
+const botsAllowed = ref(false)
+
 const challenges = reactive<Challenge[]>([])
 
 const pollId = ref<number | null>(null)
@@ -65,9 +67,19 @@ onUnmounted(() => {
       </li>
     </ul>
     <h2>Automatch</h2>
+    <input id="allow-bots" type="checkbox" v-model="botsAllowed" />
+    <label for="allow-bots"> Accept challenges from bots</label>
     <ul>
-      <li><router-link to="/play-pausing">Pausing</router-link></li>
-      <li><router-link to="/play-realtime">Realtime</router-link></li>
+      <li>
+        <router-link :to="{ name: 'play-pausing', query: { b: botsAllowed ? '1' : '0' } }"
+          >Pausing</router-link
+        >
+      </li>
+      <li>
+        <router-link :to="{ name: 'play-realtime', query: { b: botsAllowed ? '1' : '0' } }"
+          >Realtime</router-link
+        >
+      </li>
     </ul>
   </main>
 </template>
