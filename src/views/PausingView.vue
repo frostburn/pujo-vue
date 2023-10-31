@@ -426,7 +426,11 @@ const preIgnitions = computed(() => {
 // Mount server connection, game loop and animation loop.
 
 onMounted(() => {
-  websocket.addMessageListener(onMessage)
+  if (websocket.clientSocket) {
+    websocket.clientSocket.addMessageListener(onMessage)
+  } else {
+    throw new Error('Websocket unavailable')
+  }
   websocket.sendUserData()
   if (route.params.uuid) {
     websocket.acceptChallenge(route.params.uuid as string)
@@ -438,7 +442,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  websocket.removeMessageListener(onMessage)
+  if (websocket.clientSocket) {
+    websocket.clientSocket.removeMessageListener(onMessage)
+  }
   websocket.resign()
   if (tickId !== null) {
     window.clearTimeout(tickId)

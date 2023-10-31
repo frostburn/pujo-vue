@@ -19,11 +19,11 @@ function initializeAudio() {
 onMounted(async () => {
   console.log('Mounted the app')
 
-  const socket = new ClientSocket(WS_URL)
+  const clientSocket = new ClientSocket(WS_URL)
 
-  websocket.addOpenListener(hello)
+  websocket.clientSocket = clientSocket
 
-  websocket.assign(socket)
+  websocket.clientSocket.addConnectedListener(hello)
 
   document.addEventListener('touchstart', initializeAudio)
   document.addEventListener('mousedown', initializeAudio)
@@ -33,9 +33,10 @@ onMounted(async () => {
 onUnmounted(() => {
   console.log('Unmounted the app')
 
-  websocket.removeOpenListener(hello)
-
-  websocket.unassign()
+  if (websocket.clientSocket) {
+    websocket.clientSocket.removeConnectedListener(hello)
+    websocket.clientSocket = null
+  }
 
   document.removeEventListener('touchstart', initializeAudio)
   document.removeEventListener('mousedown', initializeAudio)

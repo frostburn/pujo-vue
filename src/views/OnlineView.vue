@@ -28,14 +28,20 @@ function pollChallenges() {
 }
 
 onMounted(() => {
-  websocket.addMessageListener(onMessage)
+  if (websocket.clientSocket) {
+    websocket.clientSocket.addMessageListener(onMessage)
+  } else {
+    throw new Error('Websocket unavailable')
+  }
   websocket.sendUserData()
   websocket.listChallenges()
   pollId.value = setInterval(pollChallenges, 500)
 })
 
 onUnmounted(() => {
-  websocket.removeMessageListener(onMessage)
+  if (websocket.clientSocket) {
+    websocket.clientSocket.removeMessageListener(onMessage)
+  }
   if (pollId.value) {
     clearInterval(pollId.value)
   }
