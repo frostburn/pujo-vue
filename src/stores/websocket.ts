@@ -200,6 +200,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.sendMessage({ type: 'accept challenge', uuid })
   }
 
+  function cancelGameRequest() {
+    if (!clientSocket.value) {
+      return
+    }
+    const socket = clientSocket.value!
+    socket.sendMessage({ type: 'cancel game request' })
+  }
+
   return {
     clientSocket,
     requestGame,
@@ -212,6 +220,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     timeout,
     resign,
     listChallenges,
-    acceptChallenge
+    acceptChallenge,
+    cancelGameRequest
   }
 })

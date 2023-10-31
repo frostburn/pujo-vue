@@ -250,6 +250,7 @@ function onMessage(message: ServerMessage) {
 // Game logic goes here and runs independent of animation.
 function tick() {
   if (!mirror) {
+    tickId = window.setTimeout(tick, 100)
     return
   }
   const timeStamp = window.performance.now()
@@ -293,6 +294,9 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 function requeue() {
   if (canRequeue.value) {
+    mirror = null
+    game = null
+    gameStates.value = null
     websocket.requestGame('realtime', botsAllowed)
   }
 }
@@ -384,7 +388,11 @@ onUnmounted(() => {
   if (websocket.clientSocket) {
     websocket.clientSocket.removeMessageListener(onMessage)
   }
-  websocket.resign()
+  if (mirror) {
+    websocket.resign()
+  } else {
+    websocket.cancelGameRequest()
+  }
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }

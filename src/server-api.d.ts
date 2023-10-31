@@ -107,10 +107,15 @@ type ReadyMessage = {
   type: 'ready'
 }
 
+type CancelGameRequest = {
+  type: 'cancel game request'
+}
+
 type ClientMessage =
   | GameRequest
   | ChallengeListRequest
   | AcceptChallenge
+  | CancelGameRequest
   | UserMessage
   | SimpleStateRequest
   | ResultMessage

@@ -236,6 +236,7 @@ function onMessage(message: ServerMessage) {
 // Game logic goes here and runs independent of animation.
 function tick() {
   if (!game) {
+    tickId = window.setTimeout(tick, 100)
     return
   }
   const timeStamp = window.performance.now()
@@ -354,6 +355,8 @@ function pass() {
 
 function requeue() {
   if (canRequeue.value) {
+    game = null
+    gameStates.value = null
     websocket.requestGame('pausing', botsAllowed)
   }
 }
@@ -446,7 +449,11 @@ onUnmounted(() => {
   if (websocket.clientSocket) {
     websocket.clientSocket.removeMessageListener(onMessage)
   }
-  websocket.resign()
+  if (game) {
+    websocket.resign()
+  } else {
+    websocket.cancelGameRequest()
+  }
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }
