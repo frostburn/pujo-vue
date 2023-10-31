@@ -8,7 +8,21 @@ import {
   PlayedMove
 } from 'pujo-puyo-core'
 
+// Generic types
+
 type GameType = Replay['metadata']['type']
+
+type Challenge = {
+  uuid: string
+  gameType: GameType
+  autoMatch: boolean
+  ranked: boolean
+  botsAllowed: boolean
+  name?: string
+  password?: string
+}
+
+// Incoming (server's perspective)
 
 type PausingMoveBase = {
   type: 'pausing move'
@@ -57,16 +71,24 @@ interface CoordinatedRealtimeMove extends RealtimeMoveBase {
 
 type RealtimeMove = OrientedRealtimeMove | CoordinatedRealtimeMove
 
-// Incoming (server's perspective)
-
-type GameRequest = {
+interface GameRequest extends Omit<Challenge, 'uuid'> {
   type: 'game request'
-  gameType: GameType
+}
+
+type ChallengeListRequest = {
+  type: 'challenge list'
+}
+
+type AcceptChallenge = {
+  type: 'accept challenge'
+  uuid?: string
+  password?: string
 }
 
 type UserMessage = {
   type: 'user'
   username?: string
+  isBot?: boolean
   clientInfo?: ApplicationInfo
   authUuid?: string
   socketId?: number
@@ -87,6 +109,8 @@ type ReadyMessage = {
 
 type ClientMessage =
   | GameRequest
+  | ChallengeListRequest
+  | AcceptChallenge
   | UserMessage
   | SimpleStateRequest
   | ResultMessage
@@ -164,6 +188,17 @@ type GoMessage = {
   type: 'go'
 }
 
+type ChallengeList = {
+  type: 'challenge list'
+  challenges: Challenge[]
+}
+
+type ChallengeNotFound = {
+  type: 'challenge not found'
+  uuid?: string
+  password?: string
+}
+
 type ServerMessage =
   | GameParams
   | PieceMessage
@@ -174,4 +209,6 @@ type ServerMessage =
   | ServerPausingMove
   | ServerRealtimeMove
   | ServerUserMessage
+  | ChallengeNotFound
+  | ChallengeList
   | GoMessage

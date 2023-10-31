@@ -23,7 +23,12 @@ const router = createRouter({
       component: () => import('../views/OnlineView.vue')
     },
     {
-      path: '/play-realtime',
+      path: '/play-pausing/:uuid?',
+      name: 'play-pausing',
+      component: () => import('../views/PausingView.vue')
+    },
+    {
+      path: '/play-realtime/:uuid?',
       name: 'play-realtime',
       component: () => import('../views/RealtimeView.vue')
     },

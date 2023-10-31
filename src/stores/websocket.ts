@@ -61,7 +61,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
   function sendGameRequest(socket: ClientSocket, gameType: GameType) {
     socket.sendMessage({
       type: 'game request',
-      gameType
+      gameType,
+      botsAllowed: true,
+      ranked: true,
+      autoMatch: true
     })
   }
 
@@ -186,6 +189,22 @@ export const useWebSocketStore = defineStore('websocket', () => {
     socket.sendMessage({ type: 'result', reason: 'resignation' })
   }
 
+  function listChallenges() {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.sendMessage({ type: 'challenge list' })
+  }
+
+  function acceptChallenge(uuid: string) {
+    if (guard()) {
+      return
+    }
+    const socket = webSocket.value!
+    socket.sendMessage({ type: 'accept challenge', uuid })
+  }
+
   function addOpenListener(listener: OpenListener) {
     openListeners.push(listener)
   }
@@ -217,6 +236,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     addOpenListener,
     removeOpenListener,
     addMessageListener,
-    removeMessageListener
+    removeMessageListener,
+    listChallenges,
+    acceptChallenge
   }
 })
