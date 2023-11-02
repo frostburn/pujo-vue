@@ -22,6 +22,21 @@ type Challenge = {
   password?: string
 }
 
+type ReplayFragment = {
+  id: number
+  userIds: number[]
+  winner: Replay['result']['winner']
+  reason: Replay['result']['reason']
+  names: Replay['metadata']['names']
+  elos: Replay['metadata']['elos']
+  event: Replay['metadata']['event']
+  site: Replay['metadata']['site']
+  msSince1970: Replay['metadata']['msSince1970']
+  endTime: Replay['metadata']['endTime']
+  type: Replay['metadata']['type']
+  timecontrol: Replay['metadata']['timeControl']
+}
+
 // Incoming (server's perspective)
 
 type PausingMoveBase = {
@@ -85,13 +100,16 @@ type AcceptChallenge = {
   password?: string
 }
 
-type UserMessage = {
-  type: 'user'
+type ClientRelay = {
+  socketId?: number
+}
+
+interface SelfMessage extends ClientRelay {
+  type: 'self'
   username?: string
   isBot?: boolean
   clientInfo?: ApplicationInfo
   authUuid?: string
-  socketId?: number
 }
 
 type SimpleStateRequest = {
@@ -111,17 +129,39 @@ type CancelGameRequest = {
   type: 'cancel game request'
 }
 
+interface ListReplays extends ClientRelay {
+  type: 'list replays'
+  limit?: number
+  offset?: number
+  orderBy?: string
+  direction?: 'ASC' | 'DESC'
+  userId?: number
+}
+
+interface GetReplay extends ClientRelay {
+  type: 'get replay'
+  id: number
+}
+
+interface GetUser extends ClientRelay {
+  type: 'get user'
+  id: number
+}
+
 type ClientMessage =
   | GameRequest
   | ChallengeListRequest
   | AcceptChallenge
   | CancelGameRequest
-  | UserMessage
+  | SelfMessage
   | SimpleStateRequest
   | ResultMessage
   | ReadyMessage
   | PausingMove
   | RealtimeMove
+  | ListReplays
+  | GetReplay
+  | GetUser
 
 // Outgoing (server's perspective)
 
@@ -182,8 +222,9 @@ type TimerMessage = {
   msRemaining: number
 }
 
-type ServerUserMessage = {
-  type: 'user'
+type ServerSelfReply = {
+  type: 'self'
+  id: number
   username: string
   eloRealtime: number
   eloPausing: number
@@ -204,6 +245,25 @@ type ChallengeNotFound = {
   password?: string
 }
 
+type ServerReplays = {
+  type: 'replays'
+  replays: ReplayFragment[]
+}
+
+type ServerReplay = {
+  type: 'replay'
+  replay?: Replay
+}
+
+type ServerUser = {
+  type: 'user'
+  user?: {
+    username: string
+    eloRealtime: number
+    eloPausing: number
+  }
+}
+
 type ServerMessage =
   | GameParams
   | PieceMessage
@@ -213,7 +273,10 @@ type ServerMessage =
   | TimerMessage
   | ServerPausingMove
   | ServerRealtimeMove
-  | ServerUserMessage
+  | ServerSelfReply
   | ChallengeNotFound
   | ChallengeList
   | GoMessage
+  | ServerReplays
+  | ServerReplay
+  | ServerUser

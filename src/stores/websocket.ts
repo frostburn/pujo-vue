@@ -109,7 +109,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
       localStorage.setItem('authUuid', authUuid)
     }
     socket.sendMessage({
-      type: 'user',
+      type: 'self',
       username,
       authUuid,
       clientInfo: getClientInfo()
