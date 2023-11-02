@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { WIDTH, type ReplayTrack } from 'pujo-puyo-core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   track: ReplayTrack
@@ -16,12 +16,35 @@ const TIME_SCALE = 3
 
 const duration = Math.max(...track.map((i) => i.time))
 
-const height = computed(() => `${((duration * TIME_SCALE + 38) / 170) * props.width}${props.units}`)
+const height = computed(() => `${((duration * TIME_SCALE + 80) / 170) * props.width}${props.units}`)
 const blockWidth = computed(() => props.width / 17)
 
 function timeToTop(t: number) {
-  return (((duration - t) * TIME_SCALE + 17) / 10) * blockWidth.value
+  return (((duration - t) * TIME_SCALE + 50) / 10) * blockWidth.value
 }
+
+const container = ref<HTMLDivElement | null>(null)
+
+watch(
+  () => props.time,
+  (newValue) => {
+    if (container.value) {
+      // This goes beyond the scrollable height.
+      // There's some "dead" time at the beginning and end where only the playhead moves.
+      const top =
+        (container.value.scrollHeight - container.value.clientHeight * 0.4) *
+          (1 - newValue / duration) -
+        container.value.clientHeight * 0.2
+      container.value.scrollTo({ top })
+    }
+  }
+)
+
+watch(container, (newValue) => {
+  if (newValue) {
+    newValue.scrollTo({ top: newValue.scrollHeight })
+  }
+})
 
 type Panel = { class: string; style: string }
 type Nuisance = { style: string }
@@ -138,21 +161,9 @@ const panels = computed(() => content.value[0])
 const nuisances = computed(() => content.value[1])
 const scores = computed(() => content.value[2])
 const chains = computed(() => content.value[3])
-
-const playhead = ref<HTMLDivElement | null>(null)
-function scrollToPlayhead() {
-  if (playhead.value) {
-    playhead.value.scrollIntoView({
-      block: 'center'
-    })
-  }
-}
-watch(() => props.time, scrollToPlayhead)
-
-onMounted(scrollToPlayhead)
 </script>
 <template>
-  <div class="track-container" :style="`width: ${width}${units}`">
+  <div ref="container" class="track-container" :style="`width: ${width}${units}`">
     <div
       v-for="i of WIDTH + 1"
       :key="i"
@@ -175,15 +186,15 @@ onMounted(scrollToPlayhead)
       <span class="chain-label">{{ chain.content }}</span>
     </div>
     <div
-      ref="playhead"
       class="playhead"
-      :style="`top: ${timeToTop(time) + blockWidth}${units}; width: ${0.9 * width}${units}`"
+      :style="`top: ${timeToTop(time) + blockWidth * 1.5}${units}; width: ${0.9 * width}${units}`"
     ></div>
   </div>
 </template>
 <style scoped>
 .track-container {
   position: relative;
+  overflow-y: scroll;
 }
 .track-container * {
   position: absolute;

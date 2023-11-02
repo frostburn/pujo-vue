@@ -272,7 +272,6 @@ onUnmounted(() => {
 }
 
 .container div {
-  overflow-y: scroll;
   flex: 0 0 auto;
 }
 
