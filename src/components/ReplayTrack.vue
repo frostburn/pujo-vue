@@ -1,26 +1,25 @@
 <script setup lang="ts">
-import { WIDTH, type ReplayTrack } from 'pujo-puyo-core'
+import { WIDTH, type TrackItem } from 'pujo-puyo-core'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
-  track: ReplayTrack
+  track: TrackItem[]
   time: number
   width: number
   units: string
 }>()
 
-const track = [...props.track]
-
 const COLOR_CLASSES = ['red', 'green', 'yellow', 'blue', 'purple']
 const TIME_SCALE = 3
 
-const duration = Math.max(...track.map((i) => i.time))
-
-const height = computed(() => `${((duration * TIME_SCALE + 80) / 170) * props.width}${props.units}`)
+const duration = computed(() => Math.max(...props.track.map((i) => i.time)))
+const height = computed(
+  () => `${((duration.value * TIME_SCALE + 80) / 170) * props.width}${props.units}`
+)
 const blockWidth = computed(() => props.width / 17)
 
 function timeToTop(t: number) {
-  return (((duration - t) * TIME_SCALE + 50) / 10) * blockWidth.value
+  return (((duration.value - t) * TIME_SCALE + 50) / 10) * blockWidth.value
 }
 
 const container = ref<HTMLDivElement | null>(null)
@@ -33,7 +32,7 @@ watch(
       // There's some "dead" time at the beginning and end where only the playhead moves.
       const top =
         (container.value.scrollHeight - container.value.clientHeight * 0.4) *
-          (1 - newValue / duration) -
+          (1 - newValue / duration.value) -
         container.value.clientHeight * 0.2
       container.value.scrollTo({ top })
     }
@@ -64,7 +63,7 @@ const content = computed<[Panel[], Nuisance[], Score[], Chain[]]>(() => {
 
   const panelDims = `height: ${0.9 * bw}${units}; width: ${0.9 * bw}${units};`
 
-  for (const item of track) {
+  for (const item of props.track) {
     const t = timeToTop(item.time)
     const offset = (0.075 + 9 * item.player) * bw
     if (item.type === 'move') {

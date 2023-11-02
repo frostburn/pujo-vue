@@ -6,8 +6,10 @@ import {
   type GameState,
   VISIBLE_HEIGHT,
   parseReplay,
-  type TrackItem,
-  type MultiplayerTickResult
+  type MultiplayerTickResult,
+  WIDTH,
+  NOMINAL_FRAME_RATE,
+  repairReplay
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
@@ -17,22 +19,24 @@ import { LEFT_SCREEN_X, RIGHT_SCREEN_X, SCREEN_Y } from '@/util'
 import { ChainDeck, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
+import ModalDialog from '@/components/ModalDialog.vue'
+import PlayingButton from '@/components/PlayingButton.vue'
+import type { ReplayFragment, ServerMessage } from '@/server-api'
+import { useWebSocketStore } from '@/stores/websocket'
 
 // In frames per millisecond.
-const NOMINAL_FRAME_RATE = 30 / 1000
+const DEFAULT_FRAME_RATE = NOMINAL_FRAME_RATE / 1000
 
 const SNAPSHOT_INTERVAL = 30
 
+const PER_PAGE = 10
+
 const audioContext = useAudioContextStore()
 
-const serialized = localStorage.getItem('replays.latest')
-
-let replay: Replay | undefined
+const replay = ref<Replay | null>(null)
 
 let game = new DeckedGame()
 let replayIndex = 0
-let finalTime = Infinity
-let track: TrackItem[] = []
 
 const snapshots: DeckedGame[] = []
 
@@ -43,22 +47,6 @@ function takeSnapshot(g: MultiplayerGame, tickResults: MultiplayerTickResult[]) 
   }
 }
 
-if (serialized) {
-  replay = parseReplay(serialized)
-
-  game = new DeckedGame(
-    replay.gameSeed,
-    replay.screenSeed,
-    replay.colorSelections,
-    replay.targetPoints,
-    replay.marginFrames
-  )
-
-  track = [...replayToTrack(replay, takeSnapshot, DeckedGame)]
-
-  finalTime = track[track.length - 1].time
-}
-
 let drawId: number | null = null
 let referenceTimeStamp: DOMHighResTimeStamp | null = null
 let referenceTime = 0
@@ -67,8 +55,60 @@ const time = ref(0)
 const frameRate = ref(0)
 const timeouts = reactive([false, false])
 
+// Replay list
+const websocket = useWebSocketStore()
+
+const showArchive = ref(false)
+const replayFragments = reactive<ReplayFragment[]>([])
+const replayPage = ref(0)
+
+function onMessage(message: ServerMessage) {
+  if (message.type === 'replays') {
+    replayFragments.length = 0
+    for (const replay of message.replays) {
+      replayFragments.push(replay)
+    }
+  }
+  if (message.type === 'replay' && message.replay) {
+    replay.value = repairReplay(message.replay)
+    replayIndex = 0
+    game = new DeckedGame()
+    timeModel.value = 0
+    frameRate.value = 0
+    timeouts.fill(false)
+  }
+}
+
+const track = computed(() => {
+  if (!replay.value) {
+    return []
+  }
+
+  const r = replay.value
+  game = new DeckedGame(
+    r.gameSeed,
+    r.screenSeed,
+    r.colorSelections,
+    r.targetPoints,
+    r.marginFrames,
+    r.mercyFrames
+  )
+
+  const result = [...replayToTrack(r, takeSnapshot, DeckedGame)]
+  return result
+})
+
+const finalTime = computed(() => {
+  if (track.value.length <= 0) {
+    return Infinity
+  }
+  return track.value[track.value.length - 1].time
+})
+
+const hasMorePages = computed(() => replayFragments.length === PER_PAGE)
+
 const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null, ChainDeck]>(() => {
-  if (!replay) {
+  if (!replay.value) {
     return [[], null, new ChainDeck()]
   }
 
@@ -85,7 +125,10 @@ const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null,
     }
     game = snapshots[i - 1].clone(true)
     replayIndex = 0
-    while (replayIndex < replay.moves.length && replay.moves[replayIndex].time < game.age) {
+    while (
+      replayIndex < replay.value.moves.length &&
+      replay.value.moves[replayIndex].time < game.age
+    ) {
       replayIndex++
     }
   }
@@ -94,8 +137,8 @@ const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null,
 
   // Fast-forward to the current time
   while (game.age < time.value) {
-    while (replay.moves[replayIndex]?.time === game.age) {
-      const move = replay.moves[replayIndex++]
+    while (replay.value.moves[replayIndex]?.time === game.age) {
+      const move = replay.value.moves[replayIndex++]
       game.play(move.player, move.x1, move.y1, move.orientation)
     }
     tickResults = game.tick()
@@ -124,10 +167,10 @@ const timeModel = computed({
 })
 
 const showHand = computed(() => {
-  if (!replay) {
+  if (!replay.value) {
     return false
   }
-  return time.value >= finalTime || replay.metadata.type === 'realtime'
+  return time.value >= finalTime.value || replay.value.metadata.type === 'realtime'
 })
 
 watch(frameRate, () => {
@@ -136,30 +179,31 @@ watch(frameRate, () => {
 })
 
 function deltaTime(delta: number) {
-  time.value = Math.max(0, Math.min(finalTime, Math.round(time.value) + delta))
+  time.value = Math.max(0, Math.min(finalTime.value, Math.round(time.value) + delta))
   frameRate.value = 0
   referenceTimeStamp = null
   referenceTime = time.value
 }
 
 function draw(timeStamp: DOMHighResTimeStamp) {
-  if (!replay) {
+  if (!replay.value) {
+    drawId = requestAnimationFrame(draw)
     return
   }
   if (referenceTimeStamp === null) {
     referenceTimeStamp = timeStamp
   }
   const intendedAge = (timeStamp - referenceTimeStamp) * frameRate.value
-  time.value = Math.max(0, Math.min(finalTime, referenceTime + intendedAge))
+  time.value = Math.max(0, Math.min(finalTime.value, referenceTime + intendedAge))
 
   if (frameRate.value > 0 && tickResults.value) {
     processTickSounds(audioContext, tickResults.value)
   }
 
-  if (time.value === finalTime && replay.result.reason === 'timeout') {
-    if (replay.result.winner === 0) {
+  if (time.value === finalTime.value && replay.value.result.reason === 'timeout') {
+    if (replay.value.result.winner === 0) {
       timeouts[1] = true
-    } else if (replay.result.winner === 1) {
+    } else if (replay.value.result.winner === 1) {
       timeouts[0] = true
     } else {
       timeouts.fill(true)
@@ -172,96 +216,169 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 }
 
 const winDisplays = computed(() => {
-  if (time.value < finalTime || !replay) {
+  if (time.value < finalTime.value || !replay.value) {
     return ['0', '0']
   }
-  if (replay.result.winner === 0) {
+  if (replay.value.result.winner === 0) {
     return ['1', '0']
-  } else if (replay.result.winner === undefined) {
+  } else if (replay.value.result.winner === undefined) {
     return ['½', '½']
   } else {
     return ['0', '1']
   }
 })
 
+function openArchive() {
+  websocket.listReplays(0)
+  replayPage.value = 0
+  showArchive.value = true
+}
+
+function goToPage(n: number) {
+  replayPage.value = n
+  websocket.listReplays(n)
+}
+
+function fetchReplay(id: number) {
+  websocket.getReplay(id)
+  showArchive.value = false
+}
+
+function isFinalPage(n: number) {
+  return n === replayPage.value && !hasMorePages.value
+}
+
 onMounted(() => {
   drawId = requestAnimationFrame(draw)
+
+  if (websocket.clientSocket) {
+    websocket.clientSocket.addMessageListener(onMessage)
+  } else {
+    throw new Error('Websocket unavailable')
+  }
+
+  const serialized = localStorage.getItem('replays.latest')
+
+  if (serialized) {
+    replay.value = parseReplay(serialized)
+  }
 })
 
 onUnmounted(() => {
   if (drawId !== null) {
     cancelAnimationFrame(drawId)
   }
+
+  if (websocket.clientSocket) {
+    websocket.clientSocket.removeMessageListener(onMessage)
+  }
 })
 </script>
 
 <template>
   <main>
-    <div class="container" v-if="replay">
+    <div class="container">
       <ReplayTrack :track="track" :time="time" :width="22" units="vh" />
       <svg
         ref="svg"
         width="100%"
         height="100%"
-        viewBox="0 0 20 16.5"
+        viewBox="0 0 21.5 16.5"
         xmlns="http://www.w3.org/2000/svg"
       >
         <SVGDefs />
-        <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
-          <PlayingScreen
-            :gameState="gameStates ? gameStates[0] : null"
-            :fallMu="fallMu"
-            :preIgnitions="null"
-            :chainCards="chainCards[0]"
-            :wins="winDisplays[0]"
-            :showHand="showHand"
-            :timeout="timeouts[0]"
-          />
-          <clipPath id="left-name-clip">
-            <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
-          </clipPath>
-          <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
-            {{ replay.metadata.names[0] }}
-          </text>
-        </g>
-        <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
-          <PlayingScreen
-            :gameState="gameStates ? gameStates[1] : null"
-            :fallMu="fallMu"
-            :preIgnitions="null"
-            :chainCards="chainCards[1]"
-            :wins="winDisplays[1]"
-            :showHand="showHand"
-            :timeout="timeouts[1]"
-          />
-          <clipPath id="left-name-clip">
-            <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
-          </clipPath>
-          <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
-            {{ replay.metadata.names[1] }}
-          </text>
-        </g>
+        <template v-if="replay">
+          <g :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`">
+            <PlayingScreen
+              :gameState="gameStates ? gameStates[0] : null"
+              :fallMu="fallMu"
+              :preIgnitions="null"
+              :chainCards="chainCards[0]"
+              :wins="winDisplays[0]"
+              :showHand="showHand"
+              :timeout="timeouts[0]"
+            />
+            <clipPath id="left-name-clip">
+              <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+            </clipPath>
+            <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+              {{ replay.metadata.names[0] }}
+            </text>
+          </g>
+          <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
+            <PlayingScreen
+              :gameState="gameStates ? gameStates[1] : null"
+              :fallMu="fallMu"
+              :preIgnitions="null"
+              :chainCards="chainCards[1]"
+              :wins="winDisplays[1]"
+              :showHand="showHand"
+              :timeout="timeouts[1]"
+            />
+            <clipPath id="left-name-clip">
+              <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
+            </clipPath>
+            <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+              {{ replay.metadata.names[1] }}
+            </text>
+          </g>
+        </template>
+        <text class="notice" x="1" :y="SCREEN_Y + 5.5" v-else>No latest replay found...</text>
+        <PlayingButton
+          class="active"
+          @click.stop="openArchive"
+          :width="3.5"
+          :x="RIGHT_SCREEN_X + WIDTH + 0.5"
+          :y="SCREEN_Y + 5"
+        >
+          Open Archive
+        </PlayingButton>
       </svg>
     </div>
-    <div class="container" v-else><p>No latest replay found.</p></div>
     <div>
       <input type="range" min="0" :max="finalTime" step="any" v-model="timeModel" />
     </div>
     <div>
       <button @click="deltaTime(-1)">-1 frame</button>
       <button @click="deltaTime(1)">+1 frame</button>
-      <button @click="deltaTime(-1000 * NOMINAL_FRAME_RATE)">-1 s</button>
-      <button @click="deltaTime(1000 * NOMINAL_FRAME_RATE)">+1 s</button>
-      <button @click="frameRate = frameRate ? 0 : NOMINAL_FRAME_RATE">
+      <button @click="deltaTime(-1000 * DEFAULT_FRAME_RATE)">-1 s</button>
+      <button @click="deltaTime(1000 * DEFAULT_FRAME_RATE)">+1 s</button>
+      <button @click="frameRate = frameRate ? 0 : DEFAULT_FRAME_RATE">
         {{ frameRate ? '⏸' : '▶' }}
       </button>
-      <button @click="frameRate = NOMINAL_FRAME_RATE * 0.5">×0.5</button>
-      <button @click="frameRate = NOMINAL_FRAME_RATE * 0.75">×0.75</button>
-      <button @click="frameRate = NOMINAL_FRAME_RATE">×1</button>
-      <button @click="frameRate = NOMINAL_FRAME_RATE * 1.5">×1.5</button>
-      <button @click="frameRate = NOMINAL_FRAME_RATE * 2">×2</button>
+      <button @click="frameRate = DEFAULT_FRAME_RATE * 0.5">×0.5</button>
+      <button @click="frameRate = DEFAULT_FRAME_RATE * 0.75">×0.75</button>
+      <button @click="frameRate = DEFAULT_FRAME_RATE">×1</button>
+      <button @click="frameRate = DEFAULT_FRAME_RATE * 1.5">×1.5</button>
+      <button @click="frameRate = DEFAULT_FRAME_RATE * 2">×2</button>
     </div>
   </main>
+  <Teleport to="body">
+    <ModalDialog
+      class="replay-list"
+      :show="showArchive"
+      @confirm="showArchive = false"
+      @cancel="showArchive = false"
+    >
+      <template #header>
+        <h2>Load Archived Replay (page {{ replayPage + 1 }})</h2>
+      </template>
+      <template #body>
+        <ul>
+          <li v-for="replay of replayFragments" :key="replay.id" @click="fetchReplay(replay.id)">
+            {{ replay.names.join(' vs. ') }} - {{ new Date(replay.msSince1970).toLocaleString() }}
+          </li>
+        </ul>
+        <span v-for="i of replayPage + (hasMorePages ? 2 : 1)" :key="i" @click="goToPage(i - 1)"
+          >{{ i }}{{ isFinalPage(i - 1) ? '' : ', ' }}</span
+        >
+        <span v-if="hasMorePages" @click="goToPage(replayPage + 1)">...</span>
+      </template>
+      <template #footer>
+        <button class="modal-default-button" @click="showArchive = false">Cancel</button>
+      </template>
+    </ModalDialog>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -277,6 +394,12 @@ onUnmounted(() => {
 
 .container svg {
   flex: 1 1 auto;
+  user-select: none;
+}
+
+text.notice {
+  font-size: 1px;
+  fill: var(--color-text);
 }
 
 input {
@@ -305,5 +428,14 @@ button {
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.replay-list {
+  user-select: none;
+}
+
+.replay-list span,
+li {
+  cursor: pointer;
 }
 </style>
