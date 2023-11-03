@@ -79,8 +79,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({
+    clientSocket.value.sendMessage({
       type: 'game request',
       gameType,
       botsAllowed,
@@ -93,22 +92,20 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'ready' })
+    clientSocket.value.sendMessage({ type: 'ready' })
   }
 
   function sendUserData() {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    const username = localStorage.getItem('name') || 'Anonymous'
     let authUuid = localStorage.getItem('authUuid')
     if (authUuid === null) {
       authUuid = crypto.randomUUID()
       localStorage.setItem('authUuid', authUuid)
     }
-    socket.sendMessage({
+    const username = localStorage.getItem('name') || `Anonymous-${authUuid.slice(0, 4)}`
+    clientSocket.value.sendMessage({
       type: 'self',
       username,
       authUuid,
@@ -120,8 +117,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'simple state request' })
+    clientSocket.value.sendMessage({ type: 'simple state request' })
   }
 
   function makePausingMove(
@@ -134,8 +130,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({
+    clientSocket.value.sendMessage({
       type: 'pausing move',
       x1,
       y1,
@@ -150,8 +145,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'pausing move', pass: true, msRemaining })
+    clientSocket.value.sendMessage({ type: 'pausing move', pass: true, msRemaining })
   }
 
   function makeRealtimeMove(
@@ -164,48 +158,65 @@ export const useWebSocketStore = defineStore('websocket', () => {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'realtime move', x1, y1, orientation, hardDrop, time })
+    clientSocket.value.sendMessage({ type: 'realtime move', x1, y1, orientation, hardDrop, time })
   }
 
   function timeout() {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'result', reason: 'timeout' })
+    clientSocket.value.sendMessage({ type: 'result', reason: 'timeout' })
   }
 
   function resign() {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'result', reason: 'resignation' })
+    clientSocket.value.sendMessage({ type: 'result', reason: 'resignation' })
   }
 
   function listChallenges() {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'challenge list' })
+    clientSocket.value.sendMessage({ type: 'challenge list' })
   }
 
   function acceptChallenge(uuid: string) {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'accept challenge', uuid })
+    clientSocket.value.sendMessage({ type: 'accept challenge', uuid })
   }
 
   function cancelGameRequest() {
     if (!clientSocket.value) {
       return
     }
-    const socket = clientSocket.value!
-    socket.sendMessage({ type: 'cancel game request' })
+    clientSocket.value.sendMessage({ type: 'cancel game request' })
+  }
+
+  function listReplays(page: number, perPage = 10, userId?: number) {
+    if (!clientSocket.value) {
+      return
+    }
+    const limit = perPage
+    const offset = page * perPage
+    clientSocket.value.sendMessage({
+      type: 'list replays',
+      direction: 'DESC',
+      limit,
+      offset,
+      userId,
+      finishedOnly: true
+    })
+  }
+
+  function getReplay(id: number) {
+    if (!clientSocket.value) {
+      return
+    }
+    clientSocket.value.sendMessage({ type: 'get replay', id })
   }
 
   return {
@@ -221,6 +232,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     resign,
     listChallenges,
     acceptChallenge,
-    cancelGameRequest
+    cancelGameRequest,
+    listReplays,
+    getReplay
   }
 })

@@ -133,9 +133,9 @@ interface ListReplays extends ClientRelay {
   type: 'list replays'
   limit?: number
   offset?: number
-  orderBy?: string
   direction?: 'ASC' | 'DESC'
   userId?: number
+  finishedOnly?: boolean
 }
 
 interface GetReplay extends ClientRelay {
