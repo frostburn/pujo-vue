@@ -398,7 +398,7 @@ const sStrokeWidth = computed(() => (props.active ? '0.1' : '0.03'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sSymbolFill = computed(() => (props.active ? props.secondaryStroke : 'none'))
 
-defineExpose({ x, snapX, snapY })
+defineExpose({ x1: x, y1: props.y, x2: snapX, y2: snapY })
 </script>
 <template xmlns="http://www.w3.org/2000/svg">
   <use

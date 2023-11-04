@@ -3,6 +3,7 @@ import { GHOST_Y, type GameState, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import SVGDefs from './SVGDefs.vue'
 import PlayingCursor from './PlayingCursor.vue'
+import SnakeCursor from './SnakeCursor.vue'
 import PlayingScreen from './PlayingScreen.vue'
 import {
   getFill,
@@ -41,10 +42,15 @@ const emit = defineEmits(['pass', 'commit'])
 const CONTROLS_X = RIGHT_SCREEN_X + WIDTH + 1
 const CONTROLS_Y = SCREEN_Y + 5
 
+const DEFAULT_CURSOR_TYPE = (navigator as any).userAgentData?.mobile ? 'snake' : 'lock-orbit'
+const CURSOR_TYPE = localStorage.getItem('cursorType') ?? DEFAULT_CURSOR_TYPE
+
 const svg = ref<SVGSVGElement | null>(null)
 const cursorContainer = ref<SVGGraphicsElement | null>(null)
-const cursor = ref<typeof PlayingCursor | null>(null)
+const cursor = ref<typeof PlayingCursor | typeof SnakeCursor | null>(null)
 
+const showHand = ref(false)
+const cursorVisible = ref(true)
 const cursorLocked = ref(false)
 const cursorY = ref(1)
 
@@ -92,7 +98,7 @@ const primaryStroke = computed(() => {
   if (!cursor.value || !props.gameStates || !props.gameStates[0].hand.length) {
     return MISSING_STROKE
   }
-  const index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
+  const index = cursor.value.x1 + (cursor.value.y1 + GHOST_Y + 1) * WIDTH
   if (props.gameStates[0].screen.grid[index] === props.gameStates[0].hand[0]) {
     return 'white'
   }
@@ -134,11 +140,17 @@ const cursorActive = computed(() =>
   props.gameStates ? !props.gameStates[0].busy && !props.passing : false
 )
 
+watch(cursorActive, (newValue) => {
+  if (newValue && !cursorVisible.value) {
+    showHand.value = true
+  }
+})
+
 function kickCursor() {
   if (!props.gameStates || !cursor.value) {
     return
   }
-  let index = cursor.value.x + (cursorY.value + GHOST_Y + 1) * WIDTH
+  let index = cursor.value.x1 + (cursor.value.y1 + GHOST_Y + 1) * WIDTH
   while (props.gameStates[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
     index -= WIDTH
     cursorY.value -= 1
@@ -159,21 +171,28 @@ const x1 = computed<number>(() => {
   if (!cursor.value) {
     return 2
   }
-  return cursor.value.x
+  return cursor.value.x1
+})
+
+const y1 = computed<number>(() => {
+  if (!cursor.value) {
+    return cursorY.value
+  }
+  return cursor.value.y1
 })
 
 const x2 = computed<number>(() => {
   if (!cursor.value) {
     return 2
   }
-  return cursor.value.snapX
+  return cursor.value.x2
 })
 
 const y2 = computed<number>(() => {
   if (!cursor.value) {
     return VISIBLE_HEIGHT - 2
   }
-  return cursor.value.snapY
+  return cursor.value.y2
 })
 
 const winDisplays = computed(() =>
@@ -188,7 +207,12 @@ const winDisplays = computed(() =>
   })
 )
 
-defineExpose({ x1, y1: cursorY, x2, y2 })
+function showSnake() {
+  cursorVisible.value = true
+  showHand.value = false
+}
+
+defineExpose({ x1, y1, x2, y2 })
 </script>
 
 <template>
@@ -204,10 +228,10 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
       <PlayingScreen
         :gameState="gameStates ? gameStates[0] : null"
         :fallMu="fallMu"
-        :preIgnitions="preIgnitions"
+        :preIgnitions="cursorVisible ? preIgnitions : null"
         :chainCards="chainCards[0]"
         :wins="winDisplays[0]"
-        :showHand="false"
+        :showHand="showHand"
         :timeout="timeouts[0]"
       />
     </g>
@@ -278,6 +302,7 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
       :stroke-width="STROKE_WIDTH"
     >
       <PlayingCursor
+        v-if="CURSOR_TYPE === 'lock-orbit'"
         ref="cursor"
         :svg="svg"
         :container="cursorContainer"
@@ -297,24 +322,45 @@ defineExpose({ x1, y1: cursorY, x2, y2 })
         @unlock="cursorLocked = false"
         @commit="commitMove"
       />
-      <circle
-        r="0.1"
-        :cx="(cursor ? cursor.x : 2) + 0.5"
-        :cy="primaryDropletY + 0.5"
-        :fill="primaryDropletFill"
-        stroke="white"
-        stroke-width="0.03"
-        opacity="0.7"
-      ></circle>
-      <circle
-        r="0.1"
-        :cx="(cursor ? cursor.snapX : 2) + 0.5"
-        :cy="secondaryDropletY + 0.5"
-        :fill="secondaryStroke"
-        stroke="white"
-        stroke-width="0.03"
-        opacity="0.7"
-      ></circle>
+      <SnakeCursor
+        v-else
+        ref="cursor"
+        :svg="svg"
+        :container="cursorContainer"
+        :primaryFill="primaryFill"
+        :primaryStroke="primaryStroke"
+        :primaryDarkStroke="primaryDarkStroke"
+        :primarySymbol="primarySymbol"
+        :secondaryFill="secondaryFill"
+        :secondaryStroke="secondaryStroke"
+        :secondaryDarkStroke="secondaryDarkStroke"
+        :secondarySymbol="secondarySymbol"
+        :active="cursorActive"
+        :visible="cursorVisible"
+        @commit="commitMove"
+        @show="showSnake"
+        @hide="cursorVisible = false"
+      />
+      <template v-if="cursorVisible">
+        <circle
+          r="0.1"
+          :cx="x1 + 0.5"
+          :cy="primaryDropletY + 0.5"
+          :fill="primaryDropletFill"
+          stroke="white"
+          stroke-width="0.03"
+          opacity="0.7"
+        ></circle>
+        <circle
+          r="0.1"
+          :cx="x2 + 0.5"
+          :cy="secondaryDropletY + 0.5"
+          :fill="secondaryStroke"
+          stroke="white"
+          stroke-width="0.03"
+          opacity="0.7"
+        ></circle>
+      </template>
     </g>
     <g
       v-if="canPass !== null"
