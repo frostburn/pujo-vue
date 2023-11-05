@@ -209,7 +209,7 @@ const handSymbols = computed(() =>
   <!--Playing grid-->
   <use v-for="(attrs, i) in panelAttrs" v-bind="attrs" :key="i">
     <animate
-      v-if="preIgnitions && preIgnitions[i]"
+      v-if="preIgnitions && preIgnitions[i + WIDTH * (GHOST_Y + 1)]"
       attributeName="fill"
       values="#ffe;#bbb;#ffe"
       dur="1s"

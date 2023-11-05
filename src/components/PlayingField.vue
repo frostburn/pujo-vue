@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { GHOST_Y, type GameState, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { GHOST_Y, type GameState, VISIBLE_HEIGHT, WIDTH, HEIGHT } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import SVGDefs from './SVGDefs.vue'
-import PlayingCursor from './PlayingCursor.vue'
 import SnakeCursor from './SnakeCursor.vue'
+import LockOrbitCursor from './LockOrbitCursor.vue'
 import PlayingScreen from './PlayingScreen.vue'
 import {
   getFill,
@@ -47,7 +47,7 @@ const CURSOR_TYPE = getCursorType()
 
 const svg = ref<SVGSVGElement | null>(null)
 const cursorContainer = ref<SVGGraphicsElement | null>(null)
-const cursor = ref<typeof PlayingCursor | typeof SnakeCursor | null>(null)
+const cursor = ref<typeof LockOrbitCursor | typeof SnakeCursor | null>(null)
 
 const showHand = ref(false)
 const cursorVisible = ref(true)
@@ -154,7 +154,7 @@ function kickCursor() {
   if (!props.gameStates || !cursor.value) {
     return
   }
-  let index = cursor.value.x1 + (cursor.value.y1 + GHOST_Y + 1) * WIDTH
+  let index = cursor.value.x1 + (cursorY.value + GHOST_Y + 1) * WIDTH
   while (props.gameStates[0].screen.grid[index] >= 0 && cursorY.value >= 0) {
     index -= WIDTH
     cursorY.value -= 1
@@ -168,7 +168,7 @@ function lockCursor() {
 
 function commitMove(x1: number, y1: number, orientation: number) {
   cursorLocked.value = false
-  emit('commit', x1, y1, orientation, hardDrop.value)
+  emit('commit', x1, y1 + GHOST_Y + 1, orientation, hardDrop.value)
 }
 
 const x1 = computed<number>(() => {
@@ -180,9 +180,9 @@ const x1 = computed<number>(() => {
 
 const y1 = computed<number>(() => {
   if (!cursor.value) {
-    return cursorY.value
+    return cursorY.value + GHOST_Y + 1
   }
-  return cursor.value.y1
+  return cursor.value.y1 + GHOST_Y + 1
 })
 
 const x2 = computed<number>(() => {
@@ -194,9 +194,9 @@ const x2 = computed<number>(() => {
 
 const y2 = computed<number>(() => {
   if (!cursor.value) {
-    return VISIBLE_HEIGHT - 2
+    return HEIGHT - 2
   }
-  return cursor.value.y2
+  return cursor.value.y2 + GHOST_Y + 1
 })
 
 const winDisplays = computed(() =>
@@ -211,7 +211,7 @@ const winDisplays = computed(() =>
   })
 )
 
-function showSnake() {
+function showCursor() {
   cursorVisible.value = true
   showHand.value = false
 }
@@ -305,7 +305,7 @@ defineExpose({ x1, y1, x2, y2 })
       :transform="`translate(${LEFT_SCREEN_X}, ${SCREEN_Y})`"
       :stroke-width="STROKE_WIDTH"
     >
-      <PlayingCursor
+      <LockOrbitCursor
         v-if="CURSOR_TYPE === 'lock-orbit'"
         ref="cursor"
         :svg="svg"
@@ -321,10 +321,13 @@ defineExpose({ x1, y1, x2, y2 })
         :locked="cursorLocked"
         :y="cursorY"
         :active="cursorActive"
+        :visible="cursorVisible"
         @setY="(y) => (cursorY = y)"
         @lock="lockCursor"
         @unlock="cursorLocked = false"
         @commit="commitMove"
+        @show="showCursor"
+        @hide="cursorVisible = false"
       />
       <SnakeCursor
         v-else
@@ -342,14 +345,14 @@ defineExpose({ x1, y1, x2, y2 })
         :active="cursorActive"
         :visible="cursorVisible"
         @commit="commitMove"
-        @show="showSnake"
+        @show="showCursor"
         @hide="cursorVisible = false"
       />
       <template v-if="cursorVisible">
         <circle
           r="0.1"
           :cx="x1 + 0.5"
-          :cy="primaryDropletY + 0.5"
+          :cy="primaryDropletY - GHOST_Y - 0.5"
           :fill="primaryDropletFill"
           stroke="white"
           stroke-width="0.03"
@@ -358,7 +361,7 @@ defineExpose({ x1, y1, x2, y2 })
         <circle
           r="0.1"
           :cx="x2 + 0.5"
-          :cy="secondaryDropletY + 0.5"
+          :cy="secondaryDropletY - GHOST_Y - 0.5"
           :fill="secondaryStroke"
           stroke="white"
           stroke-width="0.03"

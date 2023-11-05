@@ -9,8 +9,7 @@ import {
   type GameState,
   type Replay,
   type StrategyResult,
-  VISIBLE_HEIGHT,
-  GHOST_Y,
+  HEIGHT,
   WIDTH,
   PASS,
   DEFAULT_TARGET_POINTS
@@ -282,13 +281,14 @@ function draw(timeStamp: DOMHighResTimeStamp) {
 
 const primaryDropletY = computed(() => {
   if (!gameStates.value || !playingField.value) {
-    return VISIBLE_HEIGHT - 1
+    return HEIGHT - 1
   }
   const x1 = playingField.value.x1
   const y1 = playingField.value.y1
   const x2 = playingField.value.x2
   const y2 = playingField.value.y2
-  const bottom = game!.games[0].screen.dropPuyo(x1, y1 + GHOST_Y + 1) - GHOST_Y - 1
+
+  const bottom = game!.games[0].screen.dropPuyo(x1, y1)
   if (x1 === x2 && y2 > y1) {
     return bottom - 1
   }
@@ -297,13 +297,13 @@ const primaryDropletY = computed(() => {
 
 const secondaryDropletY = computed(() => {
   if (!gameStates.value || !playingField.value) {
-    return VISIBLE_HEIGHT - 2
+    return HEIGHT - 2
   }
   const x1 = playingField.value.x1
   const y1 = playingField.value.y1
   const x2 = playingField.value.x2
   const y2 = playingField.value.y2
-  const bottom = game!.games[0].screen.dropPuyo(x2, y2 + GHOST_Y + 1) - GHOST_Y - 1
+  const bottom = game!.games[0].screen.dropPuyo(x2, y2)
   if (x1 === x2 && y2 < y1) {
     return bottom - 1
   }
@@ -312,18 +312,16 @@ const secondaryDropletY = computed(() => {
 
 const preIgnitions = computed(() => {
   if (!gameStates.value || !playingField.value) {
-    return Array(WIDTH * VISIBLE_HEIGHT).fill(false)
+    return Array(WIDTH * HEIGHT).fill(false)
   }
-  return game!.games[0].screen
-    .preIgnite(
-      playingField.value.x1,
-      primaryDropletY.value + GHOST_Y + 1,
-      gameStates.value[0].hand[0],
-      playingField.value.x2,
-      secondaryDropletY.value + GHOST_Y + 1,
-      gameStates.value[0].hand[1]
-    )
-    .slice(WIDTH * (GHOST_Y + 1))
+  return game!.games[0].screen.preIgnite(
+    playingField.value.x1,
+    primaryDropletY.value,
+    gameStates.value[0].hand[0],
+    playingField.value.x2,
+    secondaryDropletY.value,
+    gameStates.value[0].hand[1]
+  )
 })
 
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {

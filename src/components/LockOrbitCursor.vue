@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GHOST_Y, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 
 // Please note that orbit distances less than 0.5 would need updates to the second panel during cursor movement.
@@ -25,20 +25,19 @@ const props = defineProps<{
   y: number
   locked: boolean
   active: boolean
+  visible: boolean
 }>()
 
-const emit = defineEmits(['setY', 'lock', 'unlock', 'commit'])
+const emit = defineEmits(['setY', 'lock', 'unlock', 'commit', 'hide', 'show'])
 
 const x = ref(1)
 const dx = ref(0)
 const dy = ref(-1)
 const wantsToRotate = ref(false)
 
-// Silly linter, you know nothing
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const snapX = computed(() => (Math.abs(dy.value) === 1 ? x.value : x.value + dx.value))
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const snapY = computed(() => (Math.abs(dy.value) === 1 ? props.y + dy.value : props.y))
+const y1 = computed(() => props.y)
+const x2 = computed(() => (Math.abs(dy.value) === 1 ? x.value : x.value + dx.value))
+const y2 = computed(() => (Math.abs(dy.value) === 1 ? props.y + dy.value : props.y))
 
 const orientation = computed({
   get() {
@@ -81,14 +80,18 @@ let pt: DOMPoint | null = null
 
 function containerCoords(x: number, y: number) {
   if (props.svg === null || props.container === null) {
-    return
+    throw new Error('Missing containing element')
   }
   if (pt === null) {
     pt = props.svg.createSVGPoint()
   }
   pt.x = x
   pt.y = y
-  return pt.matrixTransform(props.container.getScreenCTM()?.inverse())
+  const ctm = props.container.getScreenCTM()
+  if (!ctm) {
+    throw new Error('Unable to calculate coordinates')
+  }
+  return pt.matrixTransform(ctm.inverse())
 }
 
 function setPrimaryCoords(coords: Coords) {
@@ -123,10 +126,8 @@ function orbitSecondPanel(coords: Coords) {
 }
 
 function onMouseMove(event: MouseEvent) {
+  emit('show')
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
 
   if (props.locked) {
     orbitSecondPanel(coords)
@@ -153,26 +154,26 @@ function commitMove() {
   if (!props.locked || !props.active) {
     return
   }
-  emit('commit', x.value, props.y + GHOST_Y + 1, orientation.value)
+  emit('commit', x.value, props.y, orientation.value)
   dx.value = 0
   dy.value = -1
   wantsToRotate.value = false
 }
 
 function kickCursor() {
-  if (x.value < 0 || snapX.value < 0) {
+  if (x.value < 0 || x2.value < 0) {
     if (props.locked) {
       return true
     }
     x.value++
   }
-  if (x.value >= WIDTH || snapX.value >= WIDTH) {
+  if (x.value >= WIDTH || x2.value >= WIDTH) {
     if (props.locked) {
       return true
     }
     x.value--
   }
-  if (props.y >= VISIBLE_HEIGHT || snapY.value >= VISIBLE_HEIGHT) {
+  if (props.y >= VISIBLE_HEIGHT || y2.value >= VISIBLE_HEIGHT) {
     if (props.locked) {
       return true
     }
@@ -185,10 +186,8 @@ function onMouseDown(event: MouseEvent) {
   if (event.button !== 0 || props.locked || !props.active) {
     return
   }
+  emit('show')
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
   setPrimaryCoords(coords)
   lockPrimary()
   nextTick(() => orbitSecondPanel(coords))
@@ -199,9 +198,6 @@ function onMouseUp(event: MouseEvent) {
     return
   }
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
   orbitSecondPanel(coords)
   commitMove()
 }
@@ -219,6 +215,7 @@ function onKeyDown(event: KeyboardEvent) {
     WASD_KEYS.includes(code)
   ) {
     event.preventDefault()
+    emit('show')
   }
   if (code === 'Space' && !event.repeat && !props.locked && props.active) {
     lockPrimary()
@@ -229,24 +226,20 @@ function onKeyDown(event: KeyboardEvent) {
       emit('unlock')
     }
   } else {
-    if ((code === 'ArrowUp' || code === 'KeyW') && props.y >= 0 && snapY.value >= 0) {
+    if ((code === 'ArrowUp' || code === 'KeyW') && props.y >= 0 && y2.value >= 0) {
       emit('setY', props.y - 1)
     }
     if (
       (code === 'ArrowDown' || code === 'KeyS') &&
       props.y < VISIBLE_HEIGHT - 1 &&
-      snapY.value < VISIBLE_HEIGHT - 1
+      y2.value < VISIBLE_HEIGHT - 1
     ) {
       emit('setY', props.y + 1)
     }
-    if ((code === 'ArrowLeft' || code === 'KeyA') && x.value > 0 && snapX.value > 0) {
+    if ((code === 'ArrowLeft' || code === 'KeyA') && x.value > 0 && x2.value > 0) {
       x.value--
     }
-    if (
-      (code === 'ArrowRight' || code === 'KeyD') &&
-      x.value < WIDTH - 1 &&
-      snapX.value < WIDTH - 1
-    ) {
+    if ((code === 'ArrowRight' || code === 'KeyD') && x.value < WIDTH - 1 && x2.value < WIDTH - 1) {
       x.value++
     }
   }
@@ -288,35 +281,42 @@ function onKeyUp(event: KeyboardEvent) {
   }
 }
 
-let lockingTouch: Touch | undefined
+let lockingTouchIdentifier: number | null = null
 
 function onTouchStart(event: TouchEvent) {
-  // Prevent the touch from registering as a mousedown naturally.
-  event.preventDefault()
-
-  // Do pretty much what a mousedown does.
   if (props.locked || !props.active) {
     return
   }
-  lockingTouch = event.touches[0]
-  const coords = containerCoords(lockingTouch.clientX, lockingTouch.clientY)
-  if (coords === undefined) {
-    return
+
+  for (const touch of event.changedTouches) {
+    const coords = containerCoords(touch.clientX, touch.clientY)
+    if (coords.x > -2 && coords.x < WIDTH + 2) {
+      lockingTouchIdentifier = touch.identifier
+      event.preventDefault()
+      setPrimaryCoords(coords)
+      lockPrimary()
+      nextTick(() => orbitSecondPanel(coords))
+      emit('show')
+      return
+    }
   }
-  setPrimaryCoords(coords)
-  lockPrimary()
-  nextTick(() => orbitSecondPanel(coords))
 }
 
 function onTouchMove(event: TouchEvent) {
-  // Prevent the touch from registering as a mousemove naturally.
-  event.preventDefault()
-
-  // Do pretty much what a mousemove does.
-  const coords = containerCoords(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
-  if (coords === undefined) {
+  let touch: Touch | undefined
+  for (let i = 0; i < event.changedTouches.length; ++i) {
+    if (event.changedTouches[i].identifier === lockingTouchIdentifier) {
+      touch = event.changedTouches[i]
+      break
+    }
+  }
+  if (!touch) {
     return
   }
+
+  emit('show')
+
+  const coords = containerCoords(touch.clientX, touch.clientY)
 
   if (props.locked) {
     orbitSecondPanel(coords)
@@ -326,24 +326,39 @@ function onTouchMove(event: TouchEvent) {
 }
 
 function onTouchEnd(event: TouchEvent) {
-  // Prevent the touch from registering as a mouseup naturally.
-  event.preventDefault()
+  // No mouse emulation please
+  if (event.cancelable) {
+    event.preventDefault()
+  }
 
-  // Do pretty much what a mouseup does.
+  let touch: Touch | undefined
+  for (let i = 0; i < event.changedTouches.length; ++i) {
+    if (event.changedTouches[i].identifier === lockingTouchIdentifier) {
+      touch = event.changedTouches[i]
+      break
+    }
+  }
+  if (!touch) {
+    return
+  }
+
   if (!props.locked || !props.active) {
     return
   }
-  for (const touch of event.changedTouches) {
-    if (touch.identifier !== lockingTouch?.identifier) {
-      continue
-    }
-    const coords = containerCoords(touch.clientX, touch.clientY)
-    if (coords === undefined) {
+  const coords = containerCoords(touch.clientX, touch.clientY)
+  orbitSecondPanel(coords)
+  commitMove()
+  lockingTouchIdentifier = null
+  emit('hide')
+}
+
+function onTouchCancel(event: TouchEvent) {
+  for (let i = 0; i < event.changedTouches.length; ++i) {
+    if (event.changedTouches[i].identifier === lockingTouchIdentifier) {
+      lockingTouchIdentifier = null
+      emit('hide')
       return
     }
-    orbitSecondPanel(coords)
-    commitMove()
-    lockingTouch = undefined
   }
 }
 
@@ -355,6 +370,7 @@ watch(
       newValue.addEventListener('touchstart', onTouchStart)
       newValue.addEventListener('touchmove', onTouchMove)
       newValue.addEventListener('touchend', onTouchEnd)
+      newValue.addEventListener('touchcancel', onTouchCancel)
     }
   },
   { immediate: true }
@@ -380,6 +396,7 @@ onUnmounted(() => {
     props.svg.removeEventListener('touchstart', onTouchStart)
     props.svg.removeEventListener('touchmove', onTouchMove)
     props.svg.removeEventListener('touchend', onTouchEnd)
+    props.svg.removeEventListener('touchcancel', onTouchCancel)
   }
 })
 
@@ -398,26 +415,28 @@ const sStrokeWidth = computed(() => (props.active ? '0.1' : '0.03'))
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sSymbolFill = computed(() => (props.active ? props.secondaryStroke : 'none'))
 
-defineExpose({ x1: x, y1: props.y, x2: snapX, y2: snapY })
+defineExpose({ x1: x, y1, x2, y2 })
 </script>
 <template xmlns="http://www.w3.org/2000/svg">
-  <use
-    :x="x + 0.5"
-    :y="y + 0.5"
-    href="#panel0"
-    :fill="pFill"
-    :stroke="pStroke"
-    :stroke-width="pStrokeWidth"
-  ></use>
-  <use :x="x + 0.5" :y="y + 0.5" :href="primarySymbol" :fill="pSymbolFill"></use>
+  <template v-if="visible">
+    <use
+      :x="x + 0.5"
+      :y="y + 0.5"
+      href="#panel0"
+      :fill="pFill"
+      :stroke="pStroke"
+      :stroke-width="pStrokeWidth"
+    ></use>
+    <use :x="x + 0.5" :y="y + 0.5" :href="primarySymbol" :fill="pSymbolFill"></use>
 
-  <use
-    :x="x + dx + 0.5"
-    :y="y + dy + 0.5"
-    href="#panel0"
-    fill="none"
-    :stroke="sStroke"
-    :stroke-width="sStrokeWidth"
-  ></use>
-  <use :x="snapX + 0.5" :y="snapY + 0.5" :href="secondarySymbol" :fill="sSymbolFill"></use>
+    <use
+      :x="x + dx + 0.5"
+      :y="y + dy + 0.5"
+      href="#panel0"
+      fill="none"
+      :stroke="sStroke"
+      :stroke-width="sStrokeWidth"
+    ></use>
+    <use :x="x2 + 0.5" :y="y2 + 0.5" :href="secondarySymbol" :fill="sSymbolFill"></use>
+  </template>
 </template>

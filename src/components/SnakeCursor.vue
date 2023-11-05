@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GHOST_Y, VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
+import { VISIBLE_HEIGHT, WIDTH } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 type Coords = {
@@ -159,19 +159,23 @@ let pt: DOMPoint | null = null
 
 function containerCoords(x: number, y: number) {
   if (props.svg === null || props.container === null) {
-    return
+    throw new Error('Missing containing element')
   }
   if (pt === null) {
     pt = props.svg.createSVGPoint()
   }
   pt.x = x
   pt.y = y
-  return pt.matrixTransform(props.container.getScreenCTM()?.inverse())
+  const ctm = props.container.getScreenCTM()
+  if (!ctm) {
+    throw new Error('Unable to calculate coordinates')
+  }
+  return pt.matrixTransform(ctm.inverse())
 }
 
 function commitMove(hide = true) {
   if (props.active && actuallyActive) {
-    emit('commit', x1.value, y1.value + GHOST_Y + 1, orientation.value)
+    emit('commit', x1.value, y1.value, orientation.value)
     if (hide) {
       emit('hide')
     }
@@ -183,9 +187,6 @@ function commitMove(hide = true) {
 
 function onMouseDown(event: MouseEvent) {
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
   if (coords.x > -2 && coords.x < WIDTH + 2) {
     setCoords(coords)
     if (props.active && actuallyActive) {
@@ -199,9 +200,6 @@ function onMouseDown(event: MouseEvent) {
 
 function onMouseMove(event: MouseEvent) {
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
   setCoords(coords)
   if (props.active && actuallyActive) {
     emit('show')
@@ -213,9 +211,6 @@ function onMouseUp(event: MouseEvent) {
     return
   }
   const coords = containerCoords(event.x, event.y)
-  if (coords === undefined) {
-    return
-  }
   setCoords(coords)
   commitMove()
 }
@@ -225,9 +220,6 @@ let firstTouchIdentifier: number | null = null
 function onTouchStart(event: TouchEvent) {
   for (const touch of event.changedTouches) {
     const coords = containerCoords(touch.clientX, touch.clientY)
-    if (coords === undefined) {
-      return
-    }
 
     if (coords.x > -2 && coords.x < WIDTH + 2) {
       firstTouchIdentifier = touch.identifier
@@ -255,9 +247,6 @@ function onTouchMove(event: TouchEvent) {
   }
 
   const coords = containerCoords(touch.clientX, touch.clientY)
-  if (coords === undefined) {
-    return
-  }
 
   setCoords(coords)
   if (props.active && actuallyActive) {
@@ -284,9 +273,6 @@ function onTouchEnd(event: TouchEvent) {
   firstTouchIdentifier = null
 
   const coords = containerCoords(touch.clientX, touch.clientY)
-  if (coords === undefined) {
-    return
-  }
 
   setCoords(coords)
   commitMove()
