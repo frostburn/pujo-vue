@@ -266,6 +266,10 @@ function onTouchMove(event: TouchEvent) {
 }
 
 function onTouchEnd(event: TouchEvent) {
+  // No mouse emulation please
+  if (event.cancelable) {
+    event.preventDefault()
+  }
   let touch: Touch | undefined
   for (let i = 0; i < event.changedTouches.length; ++i) {
     if (event.changedTouches[i].identifier === firstTouchIdentifier) {

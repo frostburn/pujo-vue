@@ -425,7 +425,7 @@ onUnmounted(() => {
         v-for="(diff, i) of DIFFICULTIES"
         :key="i"
         :class="{ active: botActive && difficultyIndex === i }"
-        @click.stop="selectDifficulty(i)"
+        @mousedown.stop="selectDifficulty(i)"
         @touchstart.stop="selectDifficulty(i)"
         :x="0"
         :y="i"
@@ -433,7 +433,7 @@ onUnmounted(() => {
       >
       <PlayingButton
         :class="{ active: gameOver, disabled: !gameOver }"
-        @click.stop="restart"
+        @mousedown.stop="restart"
         @touchstart.stop="restart"
         :x="0"
         :y="6"
