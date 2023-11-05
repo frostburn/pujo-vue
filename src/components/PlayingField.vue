@@ -15,7 +15,8 @@ import {
   STROKE_WIDTH,
   LEFT_SCREEN_X,
   RIGHT_SCREEN_X,
-  SCREEN_Y
+  SCREEN_Y,
+  getCursorType
 } from '@/util'
 import type { Chain } from '@/chain-deck'
 import PlayingButton from './PlayingButton.vue'
@@ -42,8 +43,7 @@ const emit = defineEmits(['pass', 'commit'])
 const CONTROLS_X = RIGHT_SCREEN_X + WIDTH + 1
 const CONTROLS_Y = SCREEN_Y + 5
 
-const DEFAULT_CURSOR_TYPE = (navigator as any).userAgentData?.mobile ? 'snake' : 'lock-orbit'
-const CURSOR_TYPE = localStorage.getItem('cursorType') ?? DEFAULT_CURSOR_TYPE
+const CURSOR_TYPE = getCursorType()
 
 const svg = ref<SVGSVGElement | null>(null)
 const cursorContainer = ref<SVGGraphicsElement | null>(null)

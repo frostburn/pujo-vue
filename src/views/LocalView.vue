@@ -394,7 +394,9 @@ onUnmounted(() => {
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }
-  if (frameId !== null) [window.cancelAnimationFrame(frameId)]
+  if (frameId !== null) {
+    window.cancelAnimationFrame(frameId)
+  }
 })
 </script>
 

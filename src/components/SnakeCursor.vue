@@ -93,6 +93,16 @@ watch(
   }
 )
 
+function yankSecondary() {
+  const dx = x.value - secondaryX.value
+  const dy = y.value - secondaryY.value
+  const d = Math.hypot(dx, dy)
+  if (d > EPSILON) {
+    secondaryX.value = x.value - dx / d
+    secondaryY.value = y.value - dy / d
+  }
+}
+
 // Set primary coordinates and make the secondary ball follow with heavy damping.
 function setCoords(coords: Coords) {
   for (let i = prevXs.length - 1; i > 0; --i) {
@@ -126,13 +136,7 @@ function setCoords(coords: Coords) {
     secondaryY.value = secondaryY.value * 0.7 + (y.value - dy / d) * 0.3
 
     // Yank to range
-    const dsx = x.value - secondaryX.value
-    const dsy = y.value - secondaryY.value
-    const ds = Math.hypot(dsx, dsy)
-    if (ds > EPSILON) {
-      secondaryX.value = x.value - dsx / ds
-      secondaryY.value = y.value - dsy / ds
-    }
+    yankSecondary()
   }
 }
 
@@ -148,6 +152,18 @@ function containerCoords(x: number, y: number) {
   pt.x = x
   pt.y = y
   return pt.matrixTransform(props.container.getScreenCTM()?.inverse())
+}
+
+function commitMove(hide = true) {
+  if (props.active && actuallyActive) {
+    emit('commit', x1.value, y1.value + GHOST_Y + 1, orientation.value)
+    if (hide) {
+      emit('hide')
+    }
+    // Because emits take a tick to make the round trip we need this silly failsafe
+    actuallyActive = false
+  }
+  fineTuning = false
 }
 
 function onMouseDown(event: MouseEvent) {
@@ -181,13 +197,7 @@ function onMouseUp(event: MouseEvent) {
     return
   }
   setCoords(coords)
-  if (props.active) {
-    emit('commit', x1.value, y1.value + GHOST_Y + 1, orientation.value)
-    emit('hide')
-    // Because emits take a tick to make the round trip we need this silly failsafe
-    actuallyActive = false
-  }
-  fineTuning = false
+  commitMove()
 }
 
 let firstTouchIdentifier: number | null = null
@@ -255,13 +265,7 @@ function onTouchEnd(event: TouchEvent) {
   }
 
   setCoords(coords)
-
-  if (props.active) {
-    emit('commit', x1.value, y1.value + GHOST_Y + 1, orientation.value)
-    emit('hide')
-    // Because emits take a tick to make the round trip we need this silly failsafe
-    actuallyActive = false
-  }
+  commitMove()
 }
 
 function onTouchCancel(event: TouchEvent) {
@@ -271,6 +275,105 @@ function onTouchCancel(event: TouchEvent) {
       emit('hide')
       return
     }
+  }
+}
+
+let slowMode = false
+let velocityX = 0
+let velocityY = 0
+let velocityTheta = 0
+
+let frameId: number | null = null
+let lastTime: DOMHighResTimeStamp | null = null
+function draw(time: DOMHighResTimeStamp) {
+  let dt = 0
+  if (lastTime !== null) {
+    dt = time - lastTime
+  }
+  lastTime = time
+
+  if (velocityX || velocityY) {
+    const v = slowMode ? 2e-3 : 12e-3
+    setCoords({
+      x: x.value + dt * velocityX * v,
+      y: y.value + dt * velocityY * v
+    })
+  }
+
+  if (velocityTheta) {
+    const v = slowMode ? 2e-2 : 12e-2
+    const dx = secondaryX.value - x.value
+    const dy = secondaryY.value - y.value
+    secondaryX.value += dy * velocityTheta * v
+    secondaryY.value -= dx * velocityTheta * v
+    yankSecondary()
+  }
+
+  frameId = window.requestAnimationFrame(draw)
+}
+
+const ARROW_KEYS = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']
+const WASD_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD']
+
+function onKeyDown(event: KeyboardEvent) {
+  const code = event.code
+  if (
+    code === 'Space' ||
+    code === 'KeyJ' ||
+    code === 'KeyK' ||
+    ARROW_KEYS.includes(code) ||
+    WASD_KEYS.includes(code)
+  ) {
+    event.preventDefault()
+    emit('show')
+    if (code === 'Space') {
+      slowMode = true
+    }
+    if (code === 'ArrowUp' || code === 'KeyW') {
+      velocityY = -1
+    }
+    if (code === 'ArrowDown' || code === 'KeyS') {
+      velocityY = 1
+    }
+    if (code === 'ArrowLeft' || code === 'KeyA') {
+      velocityX = -1
+    }
+    if (code === 'ArrowRight' || code === 'KeyD') {
+      velocityX = 1
+    }
+
+    if (code === 'KeyJ') {
+      velocityTheta = 1
+    }
+    if (code === 'KeyK') {
+      velocityTheta = -1
+    }
+  }
+}
+
+function onKeyUp(event: KeyboardEvent) {
+  const code = event.code
+  if (event.code === 'Space') {
+    commitMove(false)
+    slowMode = false
+  }
+  if (code === 'ArrowUp' || code === 'KeyW') {
+    velocityY = 0
+  }
+  if (code === 'ArrowDown' || code === 'KeyS') {
+    velocityY = 0
+  }
+  if (code === 'ArrowLeft' || code === 'KeyA') {
+    velocityX = 0
+  }
+  if (code === 'ArrowRight' || code === 'KeyD') {
+    velocityX = 0
+  }
+  if (code === 'KeyJ') {
+    velocityTheta = 0
+  }
+  if (code === 'KeyK') {
+    velocityTheta = 0
   }
 }
 
@@ -293,11 +396,19 @@ onMounted(() => {
   emit('hide')
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
+
+  document.addEventListener('keydown', onKeyDown)
+  document.addEventListener('keyup', onKeyUp)
+
+  frameId = window.requestAnimationFrame(draw)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onMouseMove)
   document.removeEventListener('mouseup', onMouseUp)
+
+  document.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('keyup', onKeyUp)
 
   if (props.svg) {
     props.svg.removeEventListener('mousedown', onMouseDown)
@@ -306,6 +417,10 @@ onUnmounted(() => {
     props.svg.removeEventListener('touchmove', onTouchMove)
     props.svg.removeEventListener('touchend', onTouchEnd)
     props.svg.removeEventListener('touchcancel', onTouchCancel)
+  }
+
+  if (frameId !== null) {
+    window.cancelAnimationFrame(frameId)
   }
 })
 

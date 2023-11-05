@@ -4,6 +4,8 @@ import { packages } from '../package-lock.json'
 
 declare const __COMMIT_HASH__: string
 
+export type CursorType = 'snake' | 'lock-orbit'
+
 export const LEFT_SCREEN_X = 1.2
 export const RIGHT_SCREEN_X = 11
 export const SCREEN_Y = 2
@@ -141,4 +143,12 @@ export function getClientInfo(): ApplicationInfo {
       resolved: core.resolved
     }
   }
+}
+
+export function getCursorType(): CursorType {
+  const DEFAULT_CURSOR_TYPE = window.matchMedia('(pointer: coarse)').matches
+    ? 'snake'
+    : 'lock-orbit'
+  const result = localStorage.getItem('cursorType') ?? DEFAULT_CURSOR_TYPE
+  return result === 'snake' ? 'snake' : 'lock-orbit'
 }

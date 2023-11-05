@@ -213,8 +213,8 @@ function onKeyDown(event: KeyboardEvent) {
   const code = event.code
   if (
     code === 'Space' ||
-    code === 'J' ||
-    code === 'K' ||
+    code === 'KeyJ' ||
+    code === 'KeyK' ||
     ARROW_KEYS.includes(code) ||
     WASD_KEYS.includes(code)
   ) {
