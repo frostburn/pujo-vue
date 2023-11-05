@@ -186,12 +186,14 @@ function onMouseDown(event: MouseEvent) {
   if (coords === undefined) {
     return
   }
-  setCoords(coords)
-  if (props.active && actuallyActive) {
-    emit('show')
-    fineTuning = true
-    fineTuneX = coords.x
-    fineTuneY = coords.y
+  if (coords.x > -2 && coords.x < WIDTH + 2) {
+    setCoords(coords)
+    if (props.active && actuallyActive) {
+      emit('show')
+      fineTuning = true
+      fineTuneX = coords.x
+      fineTuneY = coords.y
+    }
   }
 }
 
@@ -207,6 +209,9 @@ function onMouseMove(event: MouseEvent) {
 }
 
 function onMouseUp(event: MouseEvent) {
+  if (!fineTuning) {
+    return
+  }
   const coords = containerCoords(event.x, event.y)
   if (coords === undefined) {
     return
