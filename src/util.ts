@@ -1,6 +1,7 @@
-import { BLUE, GREEN, PURPLE, RED, YELLOW, type ApplicationInfo } from 'pujo-puyo-core'
+import { BLUE, GREEN, PURPLE, RED, YELLOW, type ApplicationInfo, type Replay } from 'pujo-puyo-core'
 import { name, version } from '../package.json'
 import { packages } from '../package-lock.json'
+import type { GameParams, GameResult } from './server-api'
 
 declare const __COMMIT_HASH__: string
 
@@ -151,4 +152,52 @@ export function getCursorType(): CursorType {
     : 'lock-orbit'
   const result = localStorage.getItem('cursorType') ?? DEFAULT_CURSOR_TYPE
   return result === 'snake' ? 'snake' : 'lock-orbit'
+}
+
+// Prepare partial replay from game parameters
+export function prepareReplay(message: GameParams): Replay {
+  const replay: Replay = {
+    gameSeed: -1,
+    screenSeed: message.screenSeed,
+    colorSelections: message.colorSelections.map((cs) => [...cs]),
+    targetPoints: [...message.targetPoints],
+    marginFrames: message.marginFrames,
+    mercyFrames: message.mercyFrames,
+    moves: [],
+    metadata: { ...message.metadata },
+    result: {
+      reason: 'ongoing'
+    }
+  }
+
+  replay.metadata.names = [...replay.metadata.names]
+  replay.metadata.elos = [...replay.metadata.elos]
+  replay.metadata.priorWins = [...replay.metadata.priorWins]
+  if (replay.metadata.clients) {
+    replay.metadata.clients = [...replay.metadata.clients]
+  }
+  if (message.identity) {
+    replay.colorSelections.reverse()
+    replay.targetPoints.reverse()
+    replay.metadata.names.reverse()
+    replay.metadata.elos.reverse()
+    if (replay.metadata.clients) {
+      replay.metadata.clients.reverse()
+    }
+  }
+
+  return replay
+}
+
+export function finalizeReplay(replay: Replay, message: GameResult, identity: number): void {
+  replay.gameSeed = message.gameSeed
+  replay.result.reason = message.reason
+  replay.metadata.endTime = message.msSince1970
+  if (message.winner === identity) {
+    replay.result.winner = 0
+  } else if (message.winner === undefined) {
+    replay.result.winner = undefined
+  } else {
+    replay.result.winner = 1
+  }
 }

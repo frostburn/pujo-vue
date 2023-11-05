@@ -10,15 +10,13 @@ import {
   type Replay,
   FischerTimer,
   OnePlayerGame,
-  DEFAULT_TARGET_POINTS,
-  DEFAULT_MARGIN_FRAMES,
-  DEFAULT_MERCY_FRAMES,
   HEIGHT
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
 import type { ServerMessage, ServerPausingMove } from '@/server-api'
 import { useRoute } from 'vue-router'
+import { finalizeReplay, prepareReplay } from '@/util'
 
 // === Constants ===
 
@@ -44,28 +42,7 @@ const msPerFrame = computed(() => 1 / gameFrameRate.value)
 const gameType = ref<'pausing' | 'realtime'>('pausing')
 // Engine: In pausing mode the game is merely a mirror driven by the server.
 let game: DeckedGame | null = null
-const replay: Replay = {
-  gameSeed: -1,
-  screenSeed: -1,
-  colorSelections: [[], []],
-  targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
-  marginFrames: DEFAULT_MARGIN_FRAMES,
-  mercyFrames: DEFAULT_MERCY_FRAMES,
-  moves: [],
-  metadata: {
-    event: '',
-    names: [],
-    elos: [],
-    priorWins: [],
-    site: '',
-    round: 0,
-    msSince1970: new Date().valueOf(),
-    type: 'pausing'
-  },
-  result: {
-    reason: 'ongoing'
-  }
-}
+let replay: Replay | null = null
 let timers = [new FischerTimer(), new FischerTimer()]
 const passing = reactive([false, false])
 const justPassed = ref(false)
@@ -109,18 +86,11 @@ function onMessage(message: ServerMessage) {
     for (let i = 0; i < message.initialBags.length; ++i) {
       game.games[i].bag = [...message.initialBags[i]]
     }
-    identity = message.identity as number
-    replay.gameSeed = -1
-    replay.colorSelections = message.colorSelections
-    replay.screenSeed = message.screenSeed
-    replay.targetPoints = message.targetPoints
-    replay.marginFrames = message.marginFrames
-    replay.mercyFrames = message.mercyFrames
-    replay.moves.length = 0
-    replay.metadata = message.metadata
-    names[0] = message.metadata.names[identity]
-    names[1] = message.metadata.names[1 - identity]
-    replay.metadata.names = [...names]
+    identity = message.identity
+    replay = prepareReplay(message)
+    for (let i = 0; i < replay.metadata.names.length; ++i) {
+      names[i] = replay.metadata.names[i]
+    }
     if (message.metadata.timeControl) {
       timers[0] = FischerTimer.fromString(message.metadata.timeControl)
       timers[1] = FischerTimer.fromString(message.metadata.timeControl)
@@ -140,6 +110,7 @@ function onMessage(message: ServerMessage) {
     passing.fill(false)
     justPassed.value = false
     canRequeue.value = false
+    wins.fill(0)
     timeouts.fill(false)
     if (tickId === null) {
       tickId = window.setTimeout(tick, 1)
@@ -171,25 +142,26 @@ function onMessage(message: ServerMessage) {
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
-    replay.gameSeed = message.gameSeed
-    replay.result.reason = message.reason
-    replay.metadata.endTime = message.msSince1970
-    if (message.winner === identity) {
-      replay.result.winner = 0
+    if (!replay) {
+      throw new Error('Replay unprepared')
+    }
+    if (identity === null) {
+      throw new Error('Identity unknown')
+    }
+    finalizeReplay(replay, message, identity)
+    if (replay.result.winner === 0) {
       wins[0] = 1
       wins[1] = 0
-    } else if (message.winner === undefined) {
-      replay.result.winner = undefined
+    } else if (replay.result.winner === undefined) {
       // Negative powers of two have exact representation so this is safe
       wins[0] = 0.5
       wins[1] = 0.5
     } else {
-      replay.result.winner = 1
       wins[0] = 0
       wins[1] = 1
     }
     localStorage.setItem('replays.latest', JSON.stringify(replay))
-    if (message.reason === 'timeout') {
+    if (replay.result.reason === 'timeout') {
       if (replay.result.winner === 0) {
         timeouts[1] = true
       } else if (replay.result.winner === 1) {
@@ -234,7 +206,7 @@ function onMessage(message: ServerMessage) {
 
 // Game logic goes here and runs independent of animation.
 function tick() {
-  if (!game) {
+  if (!game || !replay) {
     tickId = window.setTimeout(tick, 100)
     return
   }
@@ -367,7 +339,7 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
     } else {
       websocket.makePausingMove(x1, y1, orientation, hardDrop, timers[0].remaining)
     }
-  } else if (game) {
+  } else if (game && replay) {
     const playedMove = game.play(0, x1, y1, orientation)
     if (LOG) {
       console.log('Pushing realtime move', playedMove)

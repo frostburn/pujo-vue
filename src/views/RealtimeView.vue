@@ -7,12 +7,9 @@ import {
   WIDTH,
   type GameState,
   type Replay,
-  DEFAULT_TARGET_POINTS,
-  DEFAULT_MARGIN_FRAMES,
   NOMINAL_FRAME_RATE,
   TimeWarpingMirror,
   type PlayedMove,
-  DEFAULT_MERCY_FRAMES,
   OnePlayerGame,
   HEIGHT
 } from 'pujo-puyo-core'
@@ -21,6 +18,7 @@ import type { ServerMessage } from '@/server-api'
 import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 import { useRoute } from 'vue-router'
+import { finalizeReplay, prepareReplay } from '@/util'
 
 // === Constants ===
 
@@ -49,28 +47,7 @@ let mirror: TimeWarpingMirror<DeckedGame> | null = null
 let game: DeckedGame | null = null
 let surrogate: OnePlayerGame | null = null
 let lastMove: PlayedMove | null = null
-const replay: Replay = {
-  gameSeed: -1,
-  screenSeed: -1,
-  colorSelections: [[], []],
-  targetPoints: [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS],
-  marginFrames: DEFAULT_MARGIN_FRAMES,
-  mercyFrames: DEFAULT_MERCY_FRAMES,
-  moves: [],
-  metadata: {
-    event: '',
-    names: [],
-    elos: [],
-    priorWins: [],
-    site: '',
-    round: 0,
-    msSince1970: new Date().valueOf(),
-    type: 'realtime'
-  },
-  result: {
-    reason: 'ongoing'
-  }
-}
+let replay: Replay | null = null
 const countdown = ref(3)
 let countDownId: number | null = null
 const canRequeue = ref(true)
@@ -132,20 +109,14 @@ function onMessage(message: ServerMessage) {
     )
     game = origin.clone(true)
     lastMove = null
-    identity = message.identity as number
-    replay.gameSeed = -1
-    replay.colorSelections = colorSelections
-    replay.screenSeed = message.screenSeed
-    replay.targetPoints = message.targetPoints
-    replay.marginFrames = message.marginFrames
-    replay.mercyFrames = message.mercyFrames
-    replay.moves.length = 0
-    replay.metadata = message.metadata
-    names[0] = message.metadata.names[identity]
-    names[1] = message.metadata.names[1 - identity]
-    replay.metadata.names = [...names]
+    identity = message.identity
+    replay = prepareReplay(message)
+    for (let i = 0; i < replay.metadata.names.length; ++i) {
+      names[i] = replay.metadata.names[i]
+    }
     canRequeue.value = false
     timeouts.fill(false)
+    wins.fill(0)
     countdown.value = 3
     countDownId = window.setTimeout(countDown, 1000)
   }
@@ -211,32 +182,32 @@ function onMessage(message: ServerMessage) {
     }
   }
   if (message.type === 'game result') {
-    replay.moves.length = 0
+    if (!replay) {
+      throw new Error('Replay unprepared')
+    }
+    if (identity === null) {
+      throw new Error('Identity unknown')
+    }
+    finalizeReplay(replay, message, identity)
     for (const moves of mirror!.moves) {
       for (const move of moves) {
         replay.moves.push(move)
       }
     }
     replay.moves.sort((a, b) => a.time - b.time)
-    replay.gameSeed = message.gameSeed
-    replay.result.reason = message.reason
-    replay.metadata.endTime = message.msSince1970
-    if (message.winner === identity) {
-      replay.result.winner = 0
+    if (replay.result.winner === 0) {
       wins[0] = 1
       wins[1] = 0
-    } else if (message.winner === undefined) {
-      replay.result.winner = undefined
+    } else if (replay.result.winner === undefined) {
       // Negative powers of two have exact representation so this is safe
       wins[0] = 0.5
       wins[1] = 0.5
     } else {
-      replay.result.winner = 1
       wins[0] = 0
       wins[1] = 1
     }
     localStorage.setItem('replays.latest', JSON.stringify(replay))
-    if (message.reason === 'timeout') {
+    if (replay.result.reason === 'timeout') {
       if (replay.result.winner === 0) {
         timeouts[1] = true
       } else if (replay.result.winner === 1) {
@@ -255,6 +226,8 @@ function onMessage(message: ServerMessage) {
         surrogate.advanceColors()
       }
     }
+    mirror!.addPiece({ player: 0, time: NaN, piece: surrogate.nextPiece })
+    surrogate.advanceColors()
   }
 }
 
@@ -313,7 +286,7 @@ function requeue() {
 }
 
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
-  if (game) {
+  if (game && replay) {
     const move = game.play(0, x1, y1, orientation, hardDrop)
     if (replay.gameSeed === -1) {
       websocket.makeRealtimeMove(move.x1, move.y1, move.orientation, false, move.time)
