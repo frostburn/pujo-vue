@@ -56,6 +56,10 @@ const cursorY = ref(1)
 
 const hardDrop = ref(Boolean(JSON.parse(localStorage.getItem('hardDrop') || 'true')))
 
+if (CURSOR_TYPE === 'snake') {
+  showHand.value = true
+}
+
 watch(hardDrop, (newValue) => {
   localStorage.setItem('hardDrop', JSON.stringify(newValue))
 })
