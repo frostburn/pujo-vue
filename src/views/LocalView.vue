@@ -21,11 +21,11 @@ import { processTickSounds } from '@/soundFX'
 // This import is broken in production mode
 // import AIWorkerUrl from "../ai-worker.ts?url"
 // Hack it together.
-let AIWorkerUrl = 'ai-worker.js'
+let AIWorkerUrl = '/ai-worker.js'
 if (import.meta.env.DEV) {
   // The browser doesn't like the worker being a module so this doesn't work either
   // AIWorkerUrl = 'src/ai-worker.ts'
-  AIWorkerUrl = 'dist/ai-worker.js'
+  AIWorkerUrl = '/dist/ai-worker.js'
 }
 
 // -- Constants --

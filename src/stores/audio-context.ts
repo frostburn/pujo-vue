@@ -27,9 +27,9 @@ export const useAudioContextStore = defineStore('audio-context', () => {
       return
     }
     // XXX: Build is broken. Hack it together.
-    let url = 'audio-processor.js'
+    let url = '/audio-processor.js'
     if (import.meta.env.DEV) {
-      url = 'src/audio-processor.ts'
+      url = '/src/audio-processor.ts'
     }
     context.value = new AudioContext({ latencyHint: 'interactive' })
     await context.value.audioWorklet.addModule(url)

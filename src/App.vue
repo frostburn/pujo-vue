@@ -12,11 +12,7 @@ function hello() {
   console.log(`Websocket opened to ${WS_URL}`)
 }
 
-function initializeAudio() {
-  audioContext.initialize()
-}
-
-onMounted(async () => {
+onMounted(() => {
   console.log('Mounted the app')
 
   const clientSocket = new ClientSocket(WS_URL)
@@ -25,12 +21,12 @@ onMounted(async () => {
 
   websocket.clientSocket.addConnectedListener(hello)
 
-  document.addEventListener('touchstart', initializeAudio)
-  document.addEventListener('mousedown', initializeAudio)
-  document.addEventListener('keydown', initializeAudio)
+  document.addEventListener('touchstart', audioContext.initialize)
+  document.addEventListener('mousedown', audioContext.initialize)
+  document.addEventListener('keydown', audioContext.initialize)
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
   console.log('Unmounted the app')
 
   if (websocket.clientSocket) {
@@ -38,11 +34,11 @@ onUnmounted(() => {
     websocket.clientSocket = null
   }
 
-  document.removeEventListener('touchstart', initializeAudio)
-  document.removeEventListener('mousedown', initializeAudio)
-  document.removeEventListener('keydown', initializeAudio)
+  document.removeEventListener('touchstart', audioContext.initialize)
+  document.removeEventListener('mousedown', audioContext.initialize)
+  document.removeEventListener('keydown', audioContext.initialize)
 
-  audioContext.unintialize()
+  await audioContext.unintialize()
 })
 </script>
 
