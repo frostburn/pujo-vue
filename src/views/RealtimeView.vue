@@ -335,7 +335,7 @@ const secondaryDropletY = computed(() => {
 })
 
 const preIgnitions = computed(() => {
-  if (!game || !gameStates.value || !playingField.value) {
+  if (!gameStates.value || !playingField.value || !game) {
     return Array(WIDTH * HEIGHT).fill(false)
   }
   return game.games[0].screen.preIgnite(
