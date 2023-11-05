@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { WIDTH, type TrackItem } from 'pujo-puyo-core'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   track: TrackItem[]
@@ -39,11 +39,25 @@ watch(
   }
 )
 
-watch(container, (newValue) => {
-  if (newValue) {
-    newValue.scrollTo({ top: newValue.scrollHeight })
+function scrollToBottom() {
+  if (!container.value) {
+    return
   }
-})
+  container.value.scrollTo({ top: container.value.scrollHeight })
+}
+
+const observer = new ResizeObserver(scrollToBottom)
+
+watch(
+  container,
+  (newValue) => {
+    if (newValue) {
+      scrollToBottom()
+      observer.observe(newValue)
+    }
+  },
+  { immediate: true }
+)
 
 type Panel = { class: string; style: string }
 type Nuisance = { style: string }
@@ -160,6 +174,10 @@ const panels = computed(() => content.value[0])
 const nuisances = computed(() => content.value[1])
 const scores = computed(() => content.value[2])
 const chains = computed(() => content.value[3])
+
+onUnmounted(() => {
+  observer.disconnect()
+})
 </script>
 <template>
   <div ref="container" class="track-container" :style="`width: ${width}${units}`">
