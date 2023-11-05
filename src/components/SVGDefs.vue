@@ -202,7 +202,7 @@ const leafVeinDs = [
         <!--Dark background-->
         <use
           href="#screen-outline"
-          fill="rgba(0, 0, 0, 0.1)"
+          fill="rgba(0, 0, 0, 0.5)"
           stroke="#101"
           stroke-width="0.16"
         ></use>
