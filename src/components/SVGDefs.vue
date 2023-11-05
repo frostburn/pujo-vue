@@ -540,4 +540,13 @@ const leafVeinDs = [
   font-size: 0.5px;
   font-family: serif;
 }
+.countdown {
+  fill: red;
+  stroke: white;
+  stroke-width: 0.04;
+  font:
+    bold 3px 'Arial',
+    sans-serif;
+  text-anchor: middle;
+}
 </style>

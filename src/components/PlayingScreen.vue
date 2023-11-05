@@ -29,6 +29,7 @@ const props = defineProps<{
   wins: string
   showHand: boolean
   timeout: boolean
+  countdown: number
 }>()
 
 const ghostAttrs = computed(() => {
@@ -356,4 +357,6 @@ const handSymbols = computed(() =>
   <text class="score" text-anchor="middle" x="-0.7" y="12">
     {{ wins }}
   </text>
+  <!--Countdown-->
+  <text v-if="countdown > 0" class="countdown" :x="WIDTH / 2" y="3">{{ countdown }}</text>
 </template>

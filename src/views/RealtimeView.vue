@@ -71,6 +71,8 @@ const replay: Replay = {
     reason: 'ongoing'
   }
 }
+const countdown = ref(3)
+let countDownId: number | null = null
 const canRequeue = ref(true)
 const wins = reactive([0, 0])
 const timeouts = reactive([false, false])
@@ -93,6 +95,15 @@ let lastAgeDrawn = -1
 const playingField = ref<typeof PlayingField | null>(null)
 
 // Server connection
+
+function countDown() {
+  countdown.value--
+  if (countdown.value) {
+    countDownId = window.setTimeout(countDown, 1000)
+  } else {
+    websocket.ready()
+  }
+}
 
 function onMessage(message: ServerMessage) {
   if (LOG) {
@@ -135,7 +146,8 @@ function onMessage(message: ServerMessage) {
     replay.metadata.names = [...names]
     canRequeue.value = false
     timeouts.fill(false)
-    websocket.ready()
+    countdown.value = 3
+    countDownId = window.setTimeout(countDown, 1000)
   }
   if (message.type === 'go') {
     referenceAge = 0
@@ -390,6 +402,9 @@ onUnmounted(() => {
   } else {
     websocket.cancelGameRequest()
   }
+  if (countDownId !== null) {
+    window.clearTimeout(countDownId)
+  }
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }
@@ -419,6 +434,7 @@ onUnmounted(() => {
       :names="names"
       :timeDisplays="['-', '-']"
       :timeDangers="[false, false]"
+      :countdown="countdown"
     >
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"

@@ -90,6 +90,9 @@ const botActive = ref(true)
 const difficulty = computed(() => DIFFICULTIES[difficultyIndex.value])
 let workerThrottleRemaining = difficulty.value.throttleFrames
 
+const countdown = ref(3)
+let countDownId: number | null = null
+
 let lastAgeDrawn = -1
 let gameSeed = randomSeed()
 let colorSelection = randomColorSelection()
@@ -340,6 +343,7 @@ function selectDifficulty(index: number) {
   replay.metadata.round = 0
   replay.metadata.priorWins = [0, 0]
   wins.fill(0)
+  restart()
 }
 
 function restart() {
@@ -381,14 +385,32 @@ function restart() {
   referenceTime = null
   referenceAge = 0
   chainCards.value = [[], []]
+
+  if (tickId !== null) {
+    window.clearTimeout(tickId)
+  }
+  countdown.value = 3
+  countDownId = window.setTimeout(countDown, 1000)
+}
+
+function countDown() {
+  countdown.value--
+  if (countdown.value) {
+    countDownId = window.setTimeout(countDown, 1000)
+  } else {
+    tickId = window.setTimeout(tick, 1)
+  }
 }
 
 onMounted(() => {
-  window.setTimeout(tick, 1)
+  countDownId = window.setTimeout(countDown, 1000)
   frameId = window.requestAnimationFrame(draw)
 })
 
 onUnmounted(() => {
+  if (countDownId !== null) {
+    window.clearTimeout(countDownId)
+  }
   if (tickId !== null) {
     window.clearTimeout(tickId)
   }
@@ -418,6 +440,7 @@ onUnmounted(() => {
       :names="[]"
       :timeDisplays="[]"
       :timeDangers="[]"
+      :countdown="countdown"
     >
       <PlayingButton
         v-for="(diff, i) of DIFFICULTIES"

@@ -36,6 +36,7 @@ const props = defineProps<{
   names: string[]
   timeDisplays: string[]
   timeDangers: boolean[]
+  countdown: number
 }>()
 
 const emit = defineEmits(['pass', 'commit'])
@@ -108,11 +109,16 @@ const primaryStroke = computed(() => {
   }
   return getStroke(props.gameStates[0].hand[0])
 })
-const primaryDarkStroke = computed(() =>
-  props.gameStates && props.gameStates[0].preview.length
-    ? getStroke(props.gameStates[0].preview[0], true)
-    : MISSING_STROKE
-)
+const primaryDarkStroke = computed(() => {
+  if (!props.gameStates) {
+    return MISSING_STROKE
+  } else if (props.gameStates[0].hand.length) {
+    return getStroke(props.gameStates[0].hand[0], true)
+  } else if (props.gameStates[0].preview.length) {
+    return getStroke(props.gameStates[0].preview[0], true)
+  }
+  return MISSING_STROKE
+})
 const primarySymbol = computed(() =>
   props.gameStates && props.gameStates[0].hand.length
     ? panelSymbol(props.gameStates[0].hand[0])
@@ -129,20 +135,28 @@ const secondaryStroke = computed(() =>
     ? getStroke(props.gameStates[0].hand[1])
     : MISSING_STROKE
 )
-const secondaryDarkStroke = computed(() =>
-  props.gameStates && props.gameStates[0].preview.length
-    ? getStroke(props.gameStates[0].preview[1], true)
-    : MISSING_STROKE
-)
+const secondaryDarkStroke = computed(() => {
+  if (!props.gameStates) {
+    return MISSING_STROKE
+  } else if (props.gameStates[0].hand.length) {
+    return getStroke(props.gameStates[0].hand[1], true)
+  } else if (props.gameStates[0].preview.length) {
+    return getStroke(props.gameStates[0].preview[1], true)
+  }
+  return MISSING_STROKE
+})
 const secondarySymbol = computed(() =>
   props.gameStates && props.gameStates[0].hand.length
     ? panelSymbol(props.gameStates[0].hand[1])
     : MISSING_SYMBOL
 )
 
-const cursorActive = computed(() =>
-  props.gameStates ? !props.gameStates[0].busy && !props.passing : false
-)
+const cursorActive = computed(() => {
+  if (!props.gameStates) {
+    return false
+  }
+  return !props.gameStates[0].busy && !props.passing && props.countdown <= 0
+})
 
 watch(cursorActive, (newValue) => {
   if (newValue && !cursorVisible.value) {
@@ -237,6 +251,7 @@ defineExpose({ x1, y1, x2, y2 })
         :wins="winDisplays[0]"
         :showHand="showHand"
         :timeout="timeouts[0]"
+        :countdown="countdown"
       />
     </g>
     <g :transform="`translate(${RIGHT_SCREEN_X}, ${SCREEN_Y})`">
@@ -248,6 +263,7 @@ defineExpose({ x1, y1, x2, y2 })
         :wins="winDisplays[1]"
         :showHand="true"
         :timeout="timeouts[1]"
+        :countdown="countdown"
       />
     </g>
     <!--Opponent thinking indicator-->

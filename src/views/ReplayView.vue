@@ -297,6 +297,7 @@ onUnmounted(() => {
               :wins="winDisplays[0]"
               :showHand="showHand"
               :timeout="timeouts[0]"
+              :countdown="0"
             />
             <clipPath id="left-name-clip">
               <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
@@ -314,6 +315,7 @@ onUnmounted(() => {
               :wins="winDisplays[1]"
               :showHand="showHand"
               :timeout="timeouts[1]"
+              :countdown="0"
             />
             <clipPath id="left-name-clip">
               <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>

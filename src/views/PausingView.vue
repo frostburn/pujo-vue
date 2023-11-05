@@ -480,6 +480,7 @@ onUnmounted(() => {
       :names="names"
       :timeDisplays="timeDisplays"
       :timeDangers="timeDangers"
+      :countdown="0"
     >
       <PlayingButton
         :class="{ active: canRequeue, disabled: !canRequeue }"
