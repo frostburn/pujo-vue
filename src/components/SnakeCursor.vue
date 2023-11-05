@@ -11,6 +11,8 @@ const EPSILON = 1e-4
 
 const FINE_TUNE_FACTOR = 0.5
 
+const LEASH_RADIUS = 0.15
+
 const props = defineProps<{
   svg: SVGSVGElement | null
   container: SVGGraphicsElement | null
@@ -104,7 +106,7 @@ function yankSecondary() {
 }
 
 // Set primary coordinates and make the secondary ball follow with heavy damping.
-function setCoords(coords: Coords) {
+function setCoords(coords: Coords, leashed = true) {
   for (let i = prevXs.length - 1; i > 0; --i) {
     prevXs[i] = prevXs[i - 1]
     prevYs[i] = prevYs[i - 1]
@@ -112,11 +114,24 @@ function setCoords(coords: Coords) {
   prevXs[0] = x.value
   prevYs[0] = y.value
 
+  if (leashed) {
+    const ldx = coords.x - x.value
+    const ldy = coords.y - y.value
+    const ld = Math.hypot(ldx, ldy)
+    if (ld < LEASH_RADIUS) {
+      return
+    }
+    coords = {
+      x: coords.x - (ldx / ld) * LEASH_RADIUS,
+      y: coords.y - (ldy / ld) * LEASH_RADIUS
+    }
+  }
+
   if (fineTuning) {
-    const dfx = coords.x - fineTuneX
-    const dfy = coords.y - fineTuneY
-    x.value = fineTuneX + dfx * FINE_TUNE_FACTOR
-    y.value = fineTuneY + dfy * FINE_TUNE_FACTOR
+    const fdx = coords.x - fineTuneX
+    const fdy = coords.y - fineTuneY
+    x.value = fineTuneX + fdx * FINE_TUNE_FACTOR
+    y.value = fineTuneY + fdy * FINE_TUNE_FACTOR
   } else {
     x.value = coords.x
     y.value = coords.y
@@ -293,11 +308,34 @@ function draw(time: DOMHighResTimeStamp) {
   lastTime = time
 
   if (velocityX || velocityY) {
+    // Push the secondary to the side to break labile equilibrium
+    const dx = secondaryX.value - x.value
+    const dy = secondaryY.value - y.value
+    const speed = Math.hypot(velocityX, velocityY)
+    const parallel = (dx * velocityX + dy * velocityY) / speed
+    if (Math.abs(parallel - 1) < 0.1) {
+      const ortho = dx * velocityY - dy * velocityX
+      if (ortho < 0) {
+        secondaryX.value -= 0.1 * dy
+        secondaryY.value += 0.1 * dy
+      } else if (ortho > 0) {
+        secondaryX.value += 0.1 * dy
+        secondaryY.value -= 0.1 * dx
+      } else {
+        secondaryX.value += 0.1 * (Math.random() - 0.5)
+        secondaryY.value += 0.1 * (Math.random() - 0.5)
+      }
+      yankSecondary()
+    }
+
     const v = slowMode ? 2e-3 : 12e-3
-    setCoords({
-      x: x.value + dt * velocityX * v,
-      y: y.value + dt * velocityY * v
-    })
+    setCoords(
+      {
+        x: x.value + dt * velocityX * v,
+        y: y.value + dt * velocityY * v
+      },
+      false
+    )
   }
 
   if (velocityTheta) {
