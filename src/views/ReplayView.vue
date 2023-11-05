@@ -17,7 +17,7 @@ import PlayingScreen from '@/components/PlayingScreen.vue'
 import ReplayTrack from '@/components/ReplayTrack.vue'
 import { LEFT_SCREEN_X, RIGHT_SCREEN_X, SCREEN_Y } from '@/util'
 import { ChainDeck, DeckedGame } from '@/chain-deck'
-import { processTickSounds } from '@/soundFX'
+import { makesSound, processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 import ModalDialog from '@/components/ModalDialog.vue'
 import PlayingButton from '@/components/PlayingButton.vue'
@@ -39,9 +39,16 @@ let game = new DeckedGame()
 let replayIndex = 0
 
 const snapshots: DeckedGame[] = []
+const tickResults: (MultiplayerTickResult | null)[] = []
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function takeSnapshot(g: MultiplayerGame, tickResults: MultiplayerTickResult[]) {
+function takeSnapshot(g: MultiplayerGame, tickResults_: MultiplayerTickResult[]) {
+  for (const tickResult of tickResults_) {
+    if (makesSound(tickResult)) {
+      tickResults.push(tickResult)
+    } else {
+      tickResults.push(null)
+    }
+  }
   if (!(g.age % SNAPSHOT_INTERVAL)) {
     snapshots.push(g.clone(true) as DeckedGame)
   }
@@ -76,6 +83,7 @@ function onMessage(message: ServerMessage) {
     timeModel.value = 0
     frameRate.value = 0
     timeouts.fill(false)
+    tickResults.length = 0
   }
 }
 
@@ -107,9 +115,9 @@ const finalTime = computed(() => {
 
 const hasMorePages = computed(() => replayFragments.length === PER_PAGE)
 
-const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null, ChainDeck]>(() => {
+const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
   if (!replay.value) {
-    return [[], null, new ChainDeck()]
+    return [[], new ChainDeck()]
   }
 
   if (time.value < 0) {
@@ -133,22 +141,19 @@ const gameAndDeckStates = computed<[GameState[], MultiplayerTickResult[] | null,
     }
   }
 
-  let tickResults: MultiplayerTickResult[] | null = null
-
   // Fast-forward to the current time
   while (game.age < time.value) {
     while (replay.value.moves[replayIndex]?.time === game.age) {
       const move = replay.value.moves[replayIndex++]
       game.play(move.player, move.x1, move.y1, move.orientation)
     }
-    tickResults = game.tick()
+    game.tick()
   }
-  return [game.state, tickResults, game.deck]
+  return [game.state, game.deck]
 })
 
 const gameStates = computed(() => gameAndDeckStates.value[0])
-const tickResults = computed(() => gameAndDeckStates.value[1])
-const chainCards = computed(() => gameAndDeckStates.value[2].chains)
+const chainCards = computed(() => gameAndDeckStates.value[1].chains)
 
 const fallMu = computed(() => time.value - Math.floor(time.value))
 
@@ -193,11 +198,20 @@ function draw(timeStamp: DOMHighResTimeStamp) {
   if (referenceTimeStamp === null) {
     referenceTimeStamp = timeStamp
   }
+
+  const soundStart = Math.floor(time.value)
+
   const intendedAge = (timeStamp - referenceTimeStamp) * frameRate.value
   time.value = Math.max(0, Math.min(finalTime.value, referenceTime + intendedAge))
 
-  if (frameRate.value > 0 && tickResults.value) {
-    processTickSounds(audioContext, tickResults.value)
+  if (frameRate.value > 0) {
+    const soundEnd = Math.floor(time.value)
+    processTickSounds(
+      audioContext,
+      tickResults
+        .slice(soundStart * 2, soundEnd * 2)
+        .filter((t) => t !== null) as MultiplayerTickResult[]
+    )
   }
 
   if (time.value === finalTime.value && replay.value.result.reason === 'timeout') {

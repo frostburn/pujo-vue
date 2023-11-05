@@ -100,3 +100,7 @@ export function processTickSounds(
     context.plop(plopOffset)
   }
 }
+
+export function makesSound(tickResult: MultiplayerTickResult) {
+  return tickResult.didClear || tickResult.coloredLanded || tickResult.garbageLanded
+}
