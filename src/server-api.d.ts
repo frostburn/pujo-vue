@@ -248,6 +248,7 @@ type ChallengeNotFound = {
 type ServerReplays = {
   type: 'replays'
   replays: ReplayFragment[]
+  totalCount: number
 }
 
 type ServerReplay = {

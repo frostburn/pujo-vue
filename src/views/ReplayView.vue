@@ -68,6 +68,8 @@ const websocket = useWebSocketStore()
 const showArchive = ref(false)
 const replayFragments = reactive<ReplayFragment[]>([])
 const replayPage = ref(0)
+const totalReplayCount = ref(0)
+const userIds = reactive<(number | null)[]>([null, null])
 
 function onMessage(message: ServerMessage) {
   if (message.type === 'replays') {
@@ -75,6 +77,7 @@ function onMessage(message: ServerMessage) {
     for (const replay of message.replays) {
       replayFragments.push(replay)
     }
+    totalReplayCount.value = message.totalCount
   }
   if (message.type === 'replay' && message.replay) {
     replay.value = repairReplay(message.replay)
@@ -113,7 +116,53 @@ const finalTime = computed(() => {
   return track.value[track.value.length - 1].time
 })
 
-const hasMorePages = computed(() => replayFragments.length === PER_PAGE)
+const numPages = computed(() => Math.ceil(totalReplayCount.value / PER_PAGE))
+
+type Page = {
+  label: string
+  click: () => void
+}
+
+const visiblePages = computed(() => {
+  const total = numPages.value
+  const result: Page[] = []
+  let min = Math.max(0, replayPage.value - 5)
+  const max = Math.min(total, min + 15)
+  min = Math.max(0, max - 15)
+  if (min > 0) {
+    result.push({
+      label: '1, ',
+      click: () => goToPage(0)
+    })
+    result.push({
+      label: '... ',
+      click: () => {}
+    })
+  }
+  for (let i = min; i < max; ++i) {
+    const n = i
+    const page = {
+      label: `${n + 1}`,
+      click: () => goToPage(n)
+    }
+    if (i < total - 1) {
+      page.label += ', '
+    }
+    result.push(page)
+  }
+  if (max < total) {
+    result.push({
+      label: '... ',
+      click: () => {}
+    })
+    result.push({
+      label: `${total}`,
+      click: () => goToPage(total - 1)
+    })
+  }
+
+  return result
+})
 
 const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
   if (!replay.value) {
@@ -242,24 +291,26 @@ const winDisplays = computed(() => {
   }
 })
 
-function openArchive() {
-  websocket.listReplays(0)
+function openArchive(userId?: number | null) {
+  if (userId === null) {
+    return
+  }
+  websocket.listReplays(0, PER_PAGE, userId)
   replayPage.value = 0
   showArchive.value = true
 }
 
 function goToPage(n: number) {
   replayPage.value = n
-  websocket.listReplays(n)
+  websocket.listReplays(n, PER_PAGE)
 }
 
-function fetchReplay(id: number) {
-  websocket.getReplay(id)
+function fetchReplay(replay: ReplayFragment) {
+  for (let i = 0; i < replay.userIds.length; ++i) {
+    userIds[i] = replay.userIds[i]
+  }
+  websocket.getReplay(replay.id)
   showArchive.value = false
-}
-
-function isFinalPage(n: number) {
-  return n === replayPage.value && !hasMorePages.value
 }
 
 onMounted(() => {
@@ -316,7 +367,13 @@ onUnmounted(() => {
             <clipPath id="left-name-clip">
               <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
             </clipPath>
-            <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+            <text
+              class="name"
+              x="0"
+              :y="VISIBLE_HEIGHT + 2"
+              clip-path="url(#left-name-clip)"
+              @click="openArchive(userIds[0])"
+            >
               {{ replay.metadata.names[0] }}
             </text>
           </g>
@@ -334,7 +391,13 @@ onUnmounted(() => {
             <clipPath id="left-name-clip">
               <rect x="0" :y="VISIBLE_HEIGHT + 1" width="6.5" height="3"></rect>
             </clipPath>
-            <text class="name" x="0" :y="VISIBLE_HEIGHT + 2" clip-path="url(#left-name-clip)">
+            <text
+              class="name"
+              x="0"
+              :y="VISIBLE_HEIGHT + 2"
+              clip-path="url(#left-name-clip)"
+              @click="openArchive(userIds[1])"
+            >
               {{ replay.metadata.names[1] }}
             </text>
           </g>
@@ -342,7 +405,7 @@ onUnmounted(() => {
         <text class="notice" x="1" :y="SCREEN_Y + 5.5" v-else>No latest replay found...</text>
         <PlayingButton
           class="active"
-          @click.stop="openArchive"
+          @click.stop="openArchive()"
           :width="3.5"
           :x="RIGHT_SCREEN_X + WIDTH + 0.5"
           :y="SCREEN_Y + 5"
@@ -381,14 +444,11 @@ onUnmounted(() => {
       </template>
       <template #body>
         <ul>
-          <li v-for="replay of replayFragments" :key="replay.id" @click="fetchReplay(replay.id)">
+          <li v-for="replay of replayFragments" :key="replay.id" @click="fetchReplay(replay)">
             {{ replay.names.join(' vs. ') }} - {{ new Date(replay.msSince1970).toLocaleString() }}
           </li>
         </ul>
-        <span v-for="i of replayPage + (hasMorePages ? 2 : 1)" :key="i" @click="goToPage(i - 1)"
-          >{{ i }}{{ isFinalPage(i - 1) ? '' : ', ' }}</span
-        >
-        <span v-if="hasMorePages" @click="goToPage(replayPage + 1)">...</span>
+        <span v-for="(page, i) of visiblePages" :key="i" @click="page.click">{{ page.label }}</span>
       </template>
       <template #footer>
         <button class="modal-default-button" @click="showArchive = false">Cancel</button>
