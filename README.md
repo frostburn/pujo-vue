@@ -1,8 +1,10 @@
 # pujo-vue
 
-Vue frontend/client for Pujo Puyo
+Vue frontend/client for Artemisia a.k.a. Pujo Puyo
 
-This template should help get you started developing with Vue 3 in Vite.
+## Play Online
+
+The game is hosted online at [pujo.lumipakkanen.com](https://pujo.lumipakkanen.com).
 
 ## Recommended IDE Setup
 
