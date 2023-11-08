@@ -366,7 +366,7 @@ defineExpose({ x1, y1, x2, y2 })
       />
       <template v-if="cursorVisible">
         <circle
-          r="0.1"
+          r="0.26"
           :cx="x1 + 0.5"
           :cy="primaryDropletY - GHOST_Y - 0.5"
           :fill="primaryDropletFill"
@@ -375,7 +375,7 @@ defineExpose({ x1, y1, x2, y2 })
           opacity="0.7"
         ></circle>
         <circle
-          r="0.1"
+          r="0.26"
           :cx="x2 + 0.5"
           :cy="secondaryDropletY - GHOST_Y - 0.5"
           :fill="secondaryStroke"
