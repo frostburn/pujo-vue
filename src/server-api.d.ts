@@ -184,7 +184,7 @@ interface ServerRealtimeMove extends PlayedMove {
 type GameParams = {
   type: 'game params'
   colorSelections: Replay['colorSelections']
-  screenSeed: Replay['screenSeed']
+  screenSeeds: Replay['screenSeeds']
   targetPoints: Replay['targetPoints']
   marginFrames: Replay['marginFrames']
   mercyFrames: Replay['mercyFrames']
@@ -208,7 +208,8 @@ type GameResult = {
   winner: ReplayResult['winner']
   reason: ReplayResult['reason']
   msSince1970: ReplayMetadata['endTime']
-  gameSeed: Replay['gameSeed']
+  gameSeeds: Replay['gameSeeds']
+  initialBags: Replay['initialBags']
 }
 
 type SimpleState = {

@@ -83,14 +83,15 @@ export class DeckedGame extends MultiplayerGame {
   deck: ChainDeck
 
   constructor(
-    seed?: number | null,
-    screenSeed?: number,
+    seeds?: number[] | null | null[],
+    screenSeeds?: number[],
     colorSelections?: number[][],
+    initialBags?: number[][],
     targetPoints?: number[],
     marginFrames = DEFAULT_MARGIN_FRAMES,
     mercyFrames = DEFAULT_MERCY_FRAMES
   ) {
-    super(seed, screenSeed, colorSelections, targetPoints, marginFrames, mercyFrames)
+    super(seeds, screenSeeds, colorSelections, initialBags, targetPoints, marginFrames, mercyFrames)
     this.deck = new ChainDeck()
   }
 

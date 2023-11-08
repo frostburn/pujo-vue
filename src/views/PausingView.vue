@@ -75,18 +75,24 @@ function onMessage(message: ServerMessage) {
     console.log(message, identity)
   }
   if (message.type === 'game params') {
+    identity = message.identity
+    const screenSeeds = [...message.screenSeeds]
+    const colorSelections = [...message.colorSelections]
+    const initialBags = [...message.initialBags]
+    if (identity) {
+      screenSeeds.reverse()
+      colorSelections.reverse()
+      initialBags.reverse()
+    }
     game = new DeckedGame(
       null,
-      message.screenSeed,
-      message.colorSelections,
+      screenSeeds,
+      colorSelections,
+      initialBags,
       message.targetPoints,
       message.marginFrames,
       message.mercyFrames
     )
-    for (let i = 0; i < message.initialBags.length; ++i) {
-      game.games[i].bag = [...message.initialBags[i]]
-    }
-    identity = message.identity
     replay = prepareReplay(message)
     for (let i = 0; i < replay.metadata.names.length; ++i) {
       names[i] = replay.metadata.names[i]
@@ -181,9 +187,10 @@ function onMessage(message: ServerMessage) {
     if (game) {
       // This is basically brain surgery just to keep playing
       const surrogate = new OnePlayerGame(
-        replay.gameSeed,
-        replay.screenSeed,
-        replay.colorSelections[0]
+        replay.gameSeeds[0],
+        replay.screenSeeds[0],
+        replay.colorSelections[0],
+        replay.initialBags[0]
       )
       for (const move of replay.moves) {
         if (move.player === 0) {

@@ -87,29 +87,28 @@ function onMessage(message: ServerMessage) {
     console.log(message, identity)
   }
   if (message.type === 'game params') {
-    // TODO: Remember to swap everything here and in OnlineView
-    const c = message.colorSelections
-    const colorSelections = identity ? [c[1], c[0]] : c
+    identity = message.identity
+    const screenSeeds = [...message.screenSeeds]
+    const colorSelections = [...message.colorSelections]
+    const initialBags = [...message.initialBags]
+    if (identity) {
+      screenSeeds.reverse()
+      colorSelections.reverse()
+      initialBags.reverse()
+    }
     const origin = new DeckedGame(
       null,
-      message.screenSeed,
+      screenSeeds,
       colorSelections,
+      initialBags,
       message.targetPoints,
       message.marginFrames,
       message.mercyFrames
     )
-    for (let i = 0; i < message.initialBags.length; ++i) {
-      origin.games[i].bag = [...message.initialBags[i]]
-    }
-    mirror = new TimeWarpingMirror(
-      origin,
-      message.initialBags,
-      CHECKPOINT_INTERVAL,
-      MAX_CHECKPOINTS
-    )
+    mirror = new TimeWarpingMirror(origin, CHECKPOINT_INTERVAL, MAX_CHECKPOINTS)
     game = origin.clone(true)
     lastMove = null
-    identity = message.identity
+
     replay = prepareReplay(message)
     for (let i = 0; i < replay.metadata.names.length; ++i) {
       names[i] = replay.metadata.names[i]
@@ -218,7 +217,12 @@ function onMessage(message: ServerMessage) {
     }
     canRequeue.value = true
     // Construct a virtual server to keep playing
-    surrogate = new OnePlayerGame(replay.gameSeed, replay.screenSeed, replay.colorSelections[0])
+    surrogate = new OnePlayerGame(
+      replay.gameSeeds[0],
+      replay.screenSeeds[0],
+      replay.colorSelections[0],
+      replay.initialBags[0]
+    )
     mirror!.bags[0] = surrogate.initialBag
     for (const move of replay.moves) {
       if (move.player === 0) {
@@ -288,7 +292,7 @@ function requeue() {
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
   if (game && replay) {
     const move = game.play(0, x1, y1, orientation, hardDrop)
-    if (replay.gameSeed === -1) {
+    if (replay.gameSeeds[0] === -1) {
       websocket.makeRealtimeMove(move.x1, move.y1, move.orientation, false, move.time)
     } else {
       replay.moves.push(move)

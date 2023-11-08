@@ -97,9 +97,10 @@ const track = computed(() => {
 
   const r = replay.value
   game = new DeckedGame(
-    r.gameSeed,
-    r.screenSeed,
+    r.gameSeeds,
+    r.screenSeeds,
     r.colorSelections,
+    r.initialBags,
     r.targetPoints,
     r.marginFrames,
     r.mercyFrames

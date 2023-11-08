@@ -157,9 +157,10 @@ export function getCursorType(): CursorType {
 // Prepare partial replay from game parameters
 export function prepareReplay(message: GameParams): Replay {
   const replay: Replay = {
-    gameSeed: -1,
-    screenSeed: message.screenSeed,
+    gameSeeds: [-1, -1],
+    screenSeeds: [...message.screenSeeds],
     colorSelections: message.colorSelections.map((cs) => [...cs]),
+    initialBags: message.initialBags.map((ib) => [...ib]),
     targetPoints: [...message.targetPoints],
     marginFrames: message.marginFrames,
     mercyFrames: message.mercyFrames,
@@ -177,7 +178,9 @@ export function prepareReplay(message: GameParams): Replay {
     replay.metadata.clients = [...replay.metadata.clients]
   }
   if (message.identity) {
+    replay.screenSeeds.reverse()
     replay.colorSelections.reverse()
+    replay.initialBags.reverse()
     replay.targetPoints.reverse()
     replay.metadata.names.reverse()
     replay.metadata.elos.reverse()
@@ -190,7 +193,12 @@ export function prepareReplay(message: GameParams): Replay {
 }
 
 export function finalizeReplay(replay: Replay, message: GameResult, identity: number): void {
-  replay.gameSeed = message.gameSeed
+  replay.gameSeeds = [...message.gameSeeds]
+  replay.initialBags = message.initialBags.map((ib) => [...ib])
+  if (identity) {
+    replay.gameSeeds.reverse()
+    replay.initialBags.reverse()
+  }
   replay.result.reason = message.reason
   replay.metadata.endTime = message.msSince1970
   if (message.winner === identity) {

@@ -12,7 +12,8 @@ import {
   HEIGHT,
   WIDTH,
   PASS,
-  DEFAULT_TARGET_POINTS
+  DEFAULT_TARGET_POINTS,
+  randomBag
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAudioContextStore } from '@/stores/audio-context'
@@ -94,25 +95,29 @@ const countdown = ref(3)
 let countDownId: number | null = null
 
 let lastAgeDrawn = -1
-let gameSeed = randomSeed()
+const gameSeeds = [randomSeed(), randomSeed()]
 let colorSelection = randomColorSelection()
-let colorSelections = [colorSelection, colorSelection]
-let screenSeed = randomSeed()
+const colorSelections = [colorSelection, colorSelection]
+const screenSeeds = [randomSeed(), randomSeed()]
+let initialBag = randomBag(colorSelection)
+const initialBags = [initialBag, initialBag]
 const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
 const marginFrames = Infinity
 const mercyFrames = Infinity
 let game = new DeckedGame(
-  gameSeed,
-  screenSeed,
+  gameSeeds,
+  screenSeeds,
   colorSelections,
+  initialBags,
   targetPoints,
   marginFrames,
   mercyFrames
 )
 const replay: Replay = {
-  gameSeed,
-  screenSeed,
-  colorSelections,
+  gameSeeds: [...gameSeeds],
+  screenSeeds: [...screenSeeds],
+  colorSelections: [...colorSelections],
+  initialBags: [...initialBags],
   targetPoints,
   marginFrames,
   mercyFrames,
@@ -352,21 +357,29 @@ function restart() {
   workerStrategy = null
   workerThrottleRemaining = difficulty.value.throttleFrames
   lastAgeDrawn = -1
-  gameSeed = randomSeed()
+  gameSeeds[0] = randomSeed()
+  gameSeeds[1] = randomSeed()
   colorSelection = randomColorSelection()
-  colorSelections = [colorSelection, colorSelection]
-  screenSeed = randomSeed()
+  colorSelections[0] = colorSelection
+  colorSelections[1] = colorSelection
+  screenSeeds[0] = randomSeed()
+  screenSeeds[1] = randomSeed()
+  initialBag = randomBag(colorSelection)
+  initialBags[0] = initialBag
+  initialBags[1] = initialBag
   game = new DeckedGame(
-    gameSeed,
-    screenSeed,
+    gameSeeds,
+    screenSeeds,
     colorSelections,
+    initialBags,
     targetPoints,
     marginFrames,
     mercyFrames
   )
-  replay.gameSeed = gameSeed
-  replay.screenSeed = screenSeed
-  replay.colorSelections = colorSelections
+  replay.gameSeeds = [...gameSeeds]
+  replay.screenSeeds = [...screenSeeds]
+  replay.colorSelections = [...colorSelections]
+  replay.initialBags = [...initialBags]
   replay.moves.length = 0
   replay.metadata.priorWins = [...wins]
   replay.metadata.round++
