@@ -209,3 +209,15 @@ export function finalizeReplay(replay: Replay, message: GameResult, identity: nu
     replay.result.winner = 1
   }
 }
+
+export function goFullScreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen()
+  }
+}
+
+export function exitFullScreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen()
+  }
+}

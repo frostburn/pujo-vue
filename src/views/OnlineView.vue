@@ -2,6 +2,7 @@
 import type { Challenge, ServerMessage } from '@/server-api'
 import { useWebSocketStore } from '@/stores/websocket'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { goFullScreen } from '@/util'
 
 const LOG = import.meta.env.DEV
 
@@ -58,11 +59,16 @@ onUnmounted(() => {
       <li v-for="challenge of challenges" :key="challenge.uuid">
         <router-link
           v-if="challenge.gameType === 'pausing'"
+          @click="goFullScreen"
           :to="{ name: 'play-pausing', params: { uuid: challenge.uuid } }"
         >
           {{ challenge.name }} / {{ challenge.gameType }}
         </router-link>
-        <router-link v-else :to="{ name: 'play-realtime', params: { uuid: challenge.uuid } }">
+        <router-link
+          v-else
+          @click="goFullScreen"
+          :to="{ name: 'play-realtime', params: { uuid: challenge.uuid } }"
+        >
           {{ challenge.name }} / {{ challenge.gameType }}
         </router-link>
       </li>
@@ -72,12 +78,16 @@ onUnmounted(() => {
     <label for="allow-bots"> Accept challenges from bots</label>
     <ul>
       <li>
-        <router-link :to="{ name: 'play-pausing', query: { b: botsAllowed ? '1' : '0' } }"
+        <router-link
+          @click="goFullScreen"
+          :to="{ name: 'play-pausing', query: { b: botsAllowed ? '1' : '0' } }"
           >Pausing</router-link
         >
       </li>
       <li>
-        <router-link :to="{ name: 'play-realtime', query: { b: botsAllowed ? '1' : '0' } }"
+        <router-link
+          @click="goFullScreen"
+          :to="{ name: 'play-realtime', query: { b: botsAllowed ? '1' : '0' } }"
           >Realtime</router-link
         >
       </li>
@@ -87,10 +97,14 @@ onUnmounted(() => {
     <input id="password" v-model="password" />
     <ul v-if="password">
       <li>
-        <router-link :to="{ name: 'play-pausing', query: { password } }">Pausing</router-link>
+        <router-link @click="goFullScreen" :to="{ name: 'play-pausing', query: { password } }"
+          >Pausing</router-link
+        >
       </li>
       <li>
-        <router-link :to="{ name: 'play-realtime', query: { password } }">Realtime</router-link>
+        <router-link @click="goFullScreen" :to="{ name: 'play-realtime', query: { password } }"
+          >Realtime</router-link
+        >
       </li>
     </ul>
   </main>

@@ -73,18 +73,18 @@ function pass() {
   }
 }
 
-function passOnEscape(event: KeyboardEvent) {
-  if (event.code === 'Escape') {
+function passOnP(event: KeyboardEvent) {
+  if (event.code === 'KeyP') {
     pass()
   }
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', passOnEscape)
+  document.addEventListener('keydown', passOnP)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', passOnEscape)
+  document.removeEventListener('keydown', passOnP)
 })
 
 // Graphics

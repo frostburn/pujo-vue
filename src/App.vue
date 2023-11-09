@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { ClientSocket, useWebSocketStore } from '@/stores/websocket'
 import { useAudioContextStore } from './stores/audio-context'
+import { goFullScreen, exitFullScreen } from './util'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://pujo.lumipakkanen.com/ws/'
 
@@ -10,6 +11,13 @@ const audioContext = useAudioContextStore()
 
 function hello() {
   console.log(`Websocket opened to ${WS_URL}`)
+}
+
+async function onKeydown(event: KeyboardEvent) {
+  if (event.code === 'Enter') {
+    goFullScreen()
+  }
+  await audioContext.initialize()
 }
 
 onMounted(() => {
@@ -23,7 +31,7 @@ onMounted(() => {
 
   document.addEventListener('touchstart', audioContext.initialize)
   document.addEventListener('mousedown', audioContext.initialize)
-  document.addEventListener('keydown', audioContext.initialize)
+  document.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(async () => {
@@ -36,7 +44,7 @@ onUnmounted(async () => {
 
   document.removeEventListener('touchstart', audioContext.initialize)
   document.removeEventListener('mousedown', audioContext.initialize)
-  document.removeEventListener('keydown', audioContext.initialize)
+  document.removeEventListener('keydown', onKeydown)
 
   await audioContext.unintialize()
 })
@@ -44,11 +52,11 @@ onUnmounted(async () => {
 
 <template>
   <nav>
-    <RouterLink to="/">Home</RouterLink>
-    <RouterLink to="/about">About</RouterLink>
-    <RouterLink to="/play-online">Play Online</RouterLink>
-    <RouterLink to="/play-cpu">Play CPU</RouterLink>
-    <RouterLink to="/replay">Replay</RouterLink>
+    <RouterLink @click="exitFullScreen" to="/">Home</RouterLink>
+    <RouterLink @click="exitFullScreen" to="/about">About</RouterLink>
+    <RouterLink @click="exitFullScreen" to="/play-online">Play Online</RouterLink>
+    <RouterLink @click="goFullScreen" to="/play-cpu">Play CPU</RouterLink>
+    <RouterLink @click="goFullScreen" to="/replay">Replay</RouterLink>
   </nav>
   <RouterView />
 </template>
