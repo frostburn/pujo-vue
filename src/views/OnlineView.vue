@@ -8,6 +8,7 @@ const LOG = import.meta.env.DEV
 const websocket = useWebSocketStore()
 
 const botsAllowed = ref(false)
+const password = ref('')
 
 const challenges = reactive<Challenge[]>([])
 
@@ -79,6 +80,17 @@ onUnmounted(() => {
         <router-link :to="{ name: 'play-realtime', query: { b: botsAllowed ? '1' : '0' } }"
           >Realtime</router-link
         >
+      </li>
+    </ul>
+    <h2>Private matchmaking</h2>
+    <label for="password">Password </label>
+    <input id="password" v-model="password" />
+    <ul v-if="password">
+      <li>
+        <router-link :to="{ name: 'play-pausing', query: { password } }">Pausing</router-link>
+      </li>
+      <li>
+        <router-link :to="{ name: 'play-realtime', query: { password } }">Realtime</router-link>
       </li>
     </ul>
   </main>

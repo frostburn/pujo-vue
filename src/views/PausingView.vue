@@ -27,6 +27,9 @@ const LOG = import.meta.env.DEV
 // Router
 const route = useRoute()
 const botsAllowed = route.query.b !== '0'
+const password: string | null = Array.isArray(route.query.password)
+  ? route.query.password[0]
+  : route.query.password
 
 // Server connection
 const websocket = useWebSocketStore()
@@ -342,7 +345,11 @@ function requeue() {
   if (canRequeue.value) {
     game = null
     gameStates.value = null
-    websocket.requestGame('pausing', botsAllowed)
+    if (password) {
+      websocket.requestGame('pausing', true, password)
+    } else {
+      websocket.requestGame('pausing', botsAllowed)
+    }
   }
 }
 
@@ -424,6 +431,8 @@ onMounted(() => {
   websocket.sendUserData()
   if (route.params.uuid) {
     websocket.acceptChallenge(route.params.uuid as string)
+  } else if (password) {
+    websocket.requestGame('pausing', true, password)
   } else {
     websocket.requestGame('pausing', botsAllowed)
   }

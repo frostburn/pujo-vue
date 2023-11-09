@@ -97,7 +97,6 @@ type ChallengeListRequest = {
 type AcceptChallenge = {
   type: 'accept challenge'
   uuid?: string
-  password?: string
 }
 
 type ClientRelay = {
@@ -243,7 +242,6 @@ type ChallengeList = {
 type ChallengeNotFound = {
   type: 'challenge not found'
   uuid?: string
-  password?: string
 }
 
 type ServerReplays = {

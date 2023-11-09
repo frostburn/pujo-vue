@@ -75,7 +75,7 @@ export class ClientSocket {
 export const useWebSocketStore = defineStore('websocket', () => {
   const clientSocket = ref<ClientSocket | null>(null)
 
-  function requestGame(gameType: GameType, botsAllowed: boolean) {
+  function requestGame(gameType: GameType, botsAllowed: boolean, password?: string) {
     if (!clientSocket.value) {
       return
     }
@@ -84,7 +84,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       gameType,
       botsAllowed,
       ranked: true,
-      autoMatch: true
+      autoMatch: password === undefined,
+      password
     })
   }
 
