@@ -33,6 +33,7 @@ const websocket = useWebSocketStore()
 let identity: number | null = null
 let opponentPieceTime: DOMHighResTimeStamp | null = null
 const moveQueues: ServerPausingMove[][] = [[], []]
+let forfeited = false
 
 const audioContext = useAudioContextStore()
 
@@ -105,6 +106,7 @@ function onMessage(message: ServerMessage) {
       timers[1] = new FischerTimer()
     }
     moveQueues.forEach((queue) => (queue.length = 0))
+    forfeited = false
     gameFrameRate.value = 45 / 1000
     gameType.value = 'pausing'
     referenceAge = 0
@@ -148,6 +150,7 @@ function onMessage(message: ServerMessage) {
     moveQueues[message.player].push(message)
   }
   if (message.type === 'game result') {
+    forfeited = true // Prevent resignation after win/draw/loss
     if (!replay) {
       throw new Error('Replay unprepared')
     }
@@ -300,7 +303,8 @@ function draw(timeStamp: DOMHighResTimeStamp) {
     }
   }
 
-  if (gameType.value === 'pausing' && timers[0].flagged()) {
+  if (gameType.value === 'pausing' && timers[0].flagged() && !forfeited) {
+    forfeited = true
     websocket.timeout()
   }
 
@@ -325,7 +329,10 @@ function pass() {
   }
   justPassed.value = true
   if (timers[0].end()) {
-    websocket.timeout()
+    if (!forfeited) {
+      forfeited = true
+      websocket.timeout()
+    }
   } else {
     websocket.passMove(timers[0].remaining)
   }
@@ -342,7 +349,10 @@ function requeue() {
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
   if (gameType.value === 'pausing') {
     if (timers[0].end()) {
-      websocket.timeout()
+      if (!forfeited) {
+        forfeited = true
+        websocket.timeout()
+      }
     } else {
       websocket.makePausingMove(x1, y1, orientation, hardDrop, timers[0].remaining)
     }
@@ -426,7 +436,10 @@ onUnmounted(() => {
     websocket.clientSocket.removeMessageListener(onMessage)
   }
   if (game) {
-    websocket.resign()
+    if (!forfeited) {
+      forfeited = true
+      websocket.resign()
+    }
   } else {
     websocket.cancelGameRequest()
   }

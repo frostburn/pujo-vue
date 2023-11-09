@@ -36,6 +36,7 @@ const botsAllowed = route.query.b !== '0'
 // Server connection
 const websocket = useWebSocketStore()
 let identity: number | null = null
+let forfeited = false
 
 const audioContext = useAudioContextStore()
 
@@ -88,6 +89,7 @@ function onMessage(message: ServerMessage) {
   }
   if (message.type === 'game params') {
     identity = message.identity
+    forfeited = false
     const screenSeeds = [...message.screenSeeds]
     const colorSelections = [...message.colorSelections]
     const initialBags = [...message.initialBags]
@@ -181,6 +183,7 @@ function onMessage(message: ServerMessage) {
     }
   }
   if (message.type === 'game result') {
+    forfeited = true // Prevent resignation after win/draw/loss
     if (!replay) {
       throw new Error('Replay unprepared')
     }
@@ -375,7 +378,10 @@ onUnmounted(() => {
     websocket.clientSocket.removeMessageListener(onMessage)
   }
   if (mirror) {
-    websocket.resign()
+    if (!forfeited) {
+      forfeited = true
+      websocket.resign()
+    }
   } else {
     websocket.cancelGameRequest()
   }
