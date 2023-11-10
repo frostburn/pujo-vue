@@ -68,5 +68,10 @@ watch(cursorType, (newValue) => localStorage.setItem('cursorType', newValue))
       <router-link :to="{ name: 'login', params: { uuid: authUuid } }">this link</router-link> to
       login from another device.
     </p>
+    <h3>Trademark Notice</h3>
+    <p>
+      <i>"Puyo Puyo"</i> is a registered U.S. trademark of SEGA CORPORATION since 2017. Artemisia /
+      Pujo Puyo is not endorsed or related to SEGA CORPORATION in any way.
+    </p>
   </main>
 </template>
