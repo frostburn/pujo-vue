@@ -18,6 +18,7 @@ import {
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAudioContextStore } from '@/stores/audio-context'
 import { processTickSounds } from '@/soundFX'
+import { saveReplay } from '@/util'
 
 // This import is broken in production mode
 // import AIWorkerUrl from "../ai-worker.ts?url"
@@ -217,7 +218,7 @@ function tick() {
       }
       replay.result.reason = 'lockout'
       replay.metadata.endTime = new Date().valueOf()
-      localStorage.setItem('replays.latest', JSON.stringify(replay))
+      saveReplay(replay)
       gameOver.value = true
     }
 
@@ -337,6 +338,9 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
 }
 
 function selectDifficulty(index: number) {
+  if (replay.moves.length) {
+    saveReplay(replay)
+  }
   if (botActive.value && index === difficultyIndex.value) {
     botActive.value = false
     replay.metadata.names[1] = 'nothing'
@@ -348,11 +352,13 @@ function selectDifficulty(index: number) {
   replay.metadata.round = 0
   replay.metadata.priorWins = [0, 0]
   wins.fill(0)
-  restart()
+  restart(false)
 }
 
-function restart() {
-  localStorage.setItem('replays.latest', JSON.stringify(replay))
+function restart(save = true) {
+  if (save) {
+    saveReplay(replay)
+  }
 
   workerStrategy = null
   workerThrottleRemaining = difficulty.value.throttleFrames

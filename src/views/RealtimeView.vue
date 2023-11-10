@@ -18,7 +18,7 @@ import type { ServerMessage } from '@/server-api'
 import { processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
 import { useRoute } from 'vue-router'
-import { finalizeReplay, prepareReplay } from '@/util'
+import { finalizeReplay, prepareReplay, saveReplay, updateReplay } from '@/util'
 
 // === Constants ===
 
@@ -211,7 +211,7 @@ function onMessage(message: ServerMessage) {
       wins[0] = 0
       wins[1] = 1
     }
-    localStorage.setItem('replays.latest', JSON.stringify(replay))
+    saveReplay(replay)
     if (replay.result.reason === 'timeout') {
       if (replay.result.winner === 0) {
         timeouts[1] = true
@@ -306,7 +306,7 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
       websocket.makeRealtimeMove(move.x1, move.y1, move.orientation, false, move.time)
     } else {
       replay.moves.push(move)
-      localStorage.setItem('replays.latest', JSON.stringify(replay))
+      updateReplay(replay)
 
       mirror!.addPiece({ player: 0, time: NaN, piece: surrogate!.nextPiece })
       surrogate!.advanceColors()

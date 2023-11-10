@@ -16,7 +16,7 @@ import { type Chain, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
 import type { ServerMessage, ServerPausingMove } from '@/server-api'
 import { useRoute } from 'vue-router'
-import { finalizeReplay, prepareReplay } from '@/util'
+import { finalizeReplay, prepareReplay, saveReplay, updateReplay } from '@/util'
 
 // === Constants ===
 
@@ -172,7 +172,7 @@ function onMessage(message: ServerMessage) {
       wins[0] = 0
       wins[1] = 1
     }
-    localStorage.setItem('replays.latest', JSON.stringify(replay))
+    saveReplay(replay)
     if (replay.result.reason === 'timeout') {
       if (replay.result.winner === 0) {
         timeouts[1] = true
@@ -369,7 +369,7 @@ function commitMove(x1: number, y1: number, orientation: number, hardDrop: boole
       console.log('Pushing realtime move', playedMove)
     }
     replay.moves.push(playedMove)
-    localStorage.setItem('replays.latest', JSON.stringify(replay))
+    updateReplay(replay)
   }
   justPassed.value = false
 }

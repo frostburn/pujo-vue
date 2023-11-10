@@ -1,9 +1,20 @@
-import { BLUE, GREEN, PURPLE, RED, YELLOW, type ApplicationInfo, type Replay } from 'pujo-puyo-core'
+import {
+  BLUE,
+  GREEN,
+  PURPLE,
+  RED,
+  YELLOW,
+  type ApplicationInfo,
+  type Replay,
+  parseReplay
+} from 'pujo-puyo-core'
 import { name, version } from '../package.json'
 import { packages } from '../package-lock.json'
 import type { GameParams, GameResult } from './server-api'
 
 declare const __COMMIT_HASH__: string
+
+export const MAX_REPLAYS = 10
 
 export type CursorType = 'snake' | 'lock-orbit'
 
@@ -220,4 +231,31 @@ export function exitFullScreen() {
   if (document.fullscreenElement) {
     document.exitFullscreen()
   }
+}
+
+export function mmod(a: number, b: number) {
+  return ((a % b) + b) % b
+}
+
+export function saveReplay(replay: Replay) {
+  const ringIndex = parseInt(localStorage.getItem('replayRingIndex') ?? '0')
+  localStorage.setItem(`replay.ring.${ringIndex}`, JSON.stringify(replay))
+  localStorage.setItem('replayRingIndex', mmod(ringIndex + 1, MAX_REPLAYS).toString())
+}
+
+export function updateReplay(replay: Replay) {
+  const ringIndex = mmod(parseInt(localStorage.getItem('replayRingIndex') ?? '0') - 1, MAX_REPLAYS)
+  localStorage.setItem(`replay.ring.${ringIndex}`, JSON.stringify(replay))
+}
+
+export function loadReplay(age = 0) {
+  const ringIndex = mmod(
+    parseInt(localStorage.getItem('replayRingIndex') ?? '0') - 1 - age,
+    MAX_REPLAYS
+  )
+  const serialized = localStorage.getItem(`replay.ring.${ringIndex}`)
+  if (!serialized) {
+    return undefined
+  }
+  return parseReplay(serialized)
 }

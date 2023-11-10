@@ -5,7 +5,6 @@ import {
   type Replay,
   type GameState,
   VISIBLE_HEIGHT,
-  parseReplay,
   type MultiplayerTickResult,
   WIDTH,
   NOMINAL_FRAME_RATE,
@@ -15,7 +14,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
 import PlayingScreen from '@/components/PlayingScreen.vue'
 import ReplayTrack from '@/components/ReplayTrack.vue'
-import { LEFT_SCREEN_X, RIGHT_SCREEN_X, SCREEN_Y } from '@/util'
+import { LEFT_SCREEN_X, MAX_REPLAYS, RIGHT_SCREEN_X, SCREEN_Y, loadReplay } from '@/util'
 import { ChainDeck, DeckedGame } from '@/chain-deck'
 import { makesSound, processTickSounds } from '@/soundFX'
 import { useAudioContextStore } from '@/stores/audio-context'
@@ -71,6 +70,16 @@ const replayPage = ref(0)
 const totalReplayCount = ref(0)
 const userIds = reactive<(number | null)[]>([null, null])
 
+function setReplay(newValue: Replay) {
+  replay.value = newValue
+  replayIndex = 0
+  game = new DeckedGame()
+  timeModel.value = 0
+  frameRate.value = 0
+  timeouts.fill(false)
+  tickResults.length = 0
+}
+
 function onMessage(message: ServerMessage) {
   if (message.type === 'replays') {
     replayFragments.length = 0
@@ -80,13 +89,7 @@ function onMessage(message: ServerMessage) {
     totalReplayCount.value = message.totalCount
   }
   if (message.type === 'replay' && message.replay) {
-    replay.value = repairReplay(message.replay)
-    replayIndex = 0
-    game = new DeckedGame()
-    timeModel.value = 0
-    frameRate.value = 0
-    timeouts.fill(false)
-    tickResults.length = 0
+    setReplay(repairReplay(message.replay))
   }
 }
 
@@ -306,12 +309,45 @@ function goToPage(n: number) {
   websocket.listReplays(n, PER_PAGE)
 }
 
-function fetchReplay(replay: ReplayFragment) {
-  for (let i = 0; i < replay.userIds.length; ++i) {
-    userIds[i] = replay.userIds[i]
+function fetchReplay(replayFragment: ReplayFragment) {
+  if (replayFragment.id <= 0) {
+    userIds.fill(null)
+    setReplay(loadReplay(-replayFragment.id)!)
+  } else {
+    for (let i = 0; i < replayFragment.userIds.length; ++i) {
+      userIds[i] = replayFragment.userIds[i]
+    }
+    websocket.getReplay(replayFragment.id)
   }
-  websocket.getReplay(replay.id)
   showArchive.value = false
+}
+
+function openLocalArchive() {
+  replayFragments.length = 0
+  totalReplayCount.value = 0
+  for (let i = 0; i < MAX_REPLAYS; ++i) {
+    const oldReplay = loadReplay(i)
+    if (oldReplay) {
+      totalReplayCount.value++
+      const m = oldReplay.metadata
+      replayFragments.push({
+        id: -i, // XXX: Hax
+        userIds: [-1, -1],
+        winner: oldReplay.result.winner,
+        reason: oldReplay.result.reason,
+        names: m.names,
+        elos: m.elos,
+        event: m.event,
+        site: m.event,
+        msSince1970: m.msSince1970,
+        endTime: m.endTime,
+        type: m.type,
+        timecontrol: m.timeControl
+      })
+    }
+  }
+  replayPage.value = 0
+  showArchive.value = true
 }
 
 onMounted(() => {
@@ -323,10 +359,10 @@ onMounted(() => {
     throw new Error('Websocket unavailable')
   }
 
-  const serialized = localStorage.getItem('replays.latest')
+  const latestReplay = loadReplay()
 
-  if (serialized) {
-    replay.value = parseReplay(serialized)
+  if (latestReplay) {
+    replay.value = latestReplay
   }
 })
 
@@ -412,6 +448,15 @@ onUnmounted(() => {
           :y="SCREEN_Y + 5"
         >
           Open Archive
+        </PlayingButton>
+        <PlayingButton
+          class="active"
+          @click.stop="openLocalArchive()"
+          :width="3.5"
+          :x="RIGHT_SCREEN_X + WIDTH + 0.5"
+          :y="SCREEN_Y + 6"
+        >
+          Load Local
         </PlayingButton>
       </svg>
     </div>
