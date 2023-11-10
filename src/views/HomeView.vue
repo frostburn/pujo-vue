@@ -3,9 +3,11 @@ import { getCursorType } from '@/util'
 import { ref, watch } from 'vue'
 import { goFullScreen } from '@/util'
 
-const name = ref(localStorage.getItem('name') || '')
+const name = ref(localStorage.getItem('name') ?? '')
 
 const cursorType = ref(getCursorType())
+
+const authUuid = localStorage.getItem('authUuid')
 
 watch(name, (newValue) => localStorage.setItem('name', newValue))
 
@@ -60,6 +62,11 @@ watch(cursorType, (newValue) => localStorage.setItem('cursorType', newValue))
       If you're on a touch device the <i>Snake</i> interface is a better option. The primary panel
       follows your touch and the secondary panel "snakes" behind. Release the touch to commit the
       move.
+    </p>
+    <p v-if="authUuid !== null">
+      P. S. You can use
+      <router-link :to="{ name: 'login', params: { uuid: authUuid } }">this link</router-link> to
+      login from another device.
     </p>
   </main>
 </template>

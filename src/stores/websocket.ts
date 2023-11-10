@@ -102,19 +102,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
     let authUuid = localStorage.getItem('authUuid')
     if (authUuid === null) {
-      // iOS Safari is missing this one for undocumented reasons...
-      if (crypto.randomUUID === undefined) {
-        // https://stackoverflow.com/a/2117523/2800218
-        // LICENSE: https://creativecommons.org/licenses/by-sa/4.0/legalcode
-        authUuid = '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
-          (
-            parseInt(c) ^
-            (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (parseInt(c) / 4)))
-          ).toString(16)
-        )
-      } else {
-        authUuid = crypto.randomUUID()
-      }
+      authUuid = crypto.randomUUID()
       localStorage.setItem('authUuid', authUuid)
     }
     const username = localStorage.getItem('name') || `Anonymous-${authUuid.slice(0, 4)}`
@@ -124,6 +112,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
       authUuid,
       clientInfo: getClientInfo()
     })
+  }
+
+  function getUserData() {
+    if (!clientSocket.value) {
+      return
+    }
+    const authUuid = localStorage.getItem('authUuid')
+    if (authUuid === null) {
+      throw new Error('Must set auth UUID before trying to obtain user data')
+    }
+    clientSocket.value.sendMessage({ type: 'self', authUuid, clientInfo: getClientInfo() })
   }
 
   function requestState() {
@@ -237,6 +236,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
     requestGame,
     ready,
     sendUserData,
+    getUserData,
     requestState,
     makePausingMove,
     passMove,

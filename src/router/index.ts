@@ -41,6 +41,11 @@ const router = createRouter({
       path: '/replay',
       name: 'replay',
       component: () => import('../views/ReplayView.vue')
+    },
+    {
+      path: '/login/:uuid',
+      name: 'login',
+      component: () => import('../views/LoginView.vue')
     }
   ]
 })
