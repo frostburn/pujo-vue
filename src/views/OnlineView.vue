@@ -2,7 +2,7 @@
 import type { Challenge, ServerMessage } from '@/server-api'
 import { useWebSocketStore } from '@/stores/websocket'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import { goFullScreen } from '@/util'
+import { goFullscreen } from '@/util'
 
 const LOG = import.meta.env.DEV
 
@@ -59,14 +59,14 @@ onUnmounted(() => {
       <li v-for="challenge of challenges" :key="challenge.uuid">
         <router-link
           v-if="challenge.gameType === 'pausing'"
-          @click="goFullScreen"
+          @click="goFullscreen"
           :to="{ name: 'play-pausing', params: { uuid: challenge.uuid } }"
         >
           {{ challenge.name }} / {{ challenge.gameType }}
         </router-link>
         <router-link
           v-else
-          @click="goFullScreen"
+          @click="goFullscreen"
           :to="{ name: 'play-realtime', params: { uuid: challenge.uuid } }"
         >
           {{ challenge.name }} / {{ challenge.gameType }}
@@ -79,14 +79,14 @@ onUnmounted(() => {
     <ul>
       <li>
         <router-link
-          @click="goFullScreen"
+          @click="goFullscreen"
           :to="{ name: 'play-pausing', query: { b: botsAllowed ? '1' : '0' } }"
           >Pausing</router-link
         >
       </li>
       <li>
         <router-link
-          @click="goFullScreen"
+          @click="goFullscreen"
           :to="{ name: 'play-realtime', query: { b: botsAllowed ? '1' : '0' } }"
           >Realtime</router-link
         >
@@ -97,12 +97,12 @@ onUnmounted(() => {
     <input id="password" v-model="password" />
     <ul v-if="password">
       <li>
-        <router-link @click="goFullScreen" :to="{ name: 'play-pausing', query: { password } }"
+        <router-link @click="goFullscreen" :to="{ name: 'play-pausing', query: { password } }"
           >Pausing</router-link
         >
       </li>
       <li>
-        <router-link @click="goFullScreen" :to="{ name: 'play-realtime', query: { password } }"
+        <router-link @click="goFullscreen" :to="{ name: 'play-realtime', query: { password } }"
           >Realtime</router-link
         >
       </li>

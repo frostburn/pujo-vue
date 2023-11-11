@@ -221,13 +221,14 @@ export function finalizeReplay(replay: Replay, message: GameResult, identity: nu
   }
 }
 
-export function goFullScreen() {
-  if (!document.fullscreenElement) {
+export function goFullscreen() {
+  // Apple fix your browsers...
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
     document.documentElement.requestFullscreen()
   }
 }
 
-export function exitFullScreen() {
+export function exitFullscreen() {
   if (document.fullscreenElement) {
     document.exitFullscreen()
   }

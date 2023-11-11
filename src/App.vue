@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { ClientSocket, useWebSocketStore } from '@/stores/websocket'
 import { useAudioContextStore } from './stores/audio-context'
-import { goFullScreen, exitFullScreen } from './util'
+import { goFullscreen, exitFullscreen } from './util'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://pujo.lumipakkanen.com/ws/'
 
@@ -15,7 +15,7 @@ function hello() {
 
 async function onKeydown(event: KeyboardEvent) {
   if (event.code === 'Enter') {
-    goFullScreen()
+    goFullscreen()
   }
   await audioContext.initialize()
 }
@@ -52,11 +52,11 @@ onUnmounted(async () => {
 
 <template>
   <nav>
-    <RouterLink @click="exitFullScreen" to="/">Home</RouterLink>
-    <RouterLink @click="exitFullScreen" to="/about">About</RouterLink>
-    <RouterLink @click="exitFullScreen" to="/play-online">Play Online</RouterLink>
-    <RouterLink @click="goFullScreen" to="/play-cpu">Play CPU</RouterLink>
-    <RouterLink @click="goFullScreen" to="/replay">Replay</RouterLink>
+    <RouterLink @click="exitFullscreen" to="/">Home</RouterLink>
+    <RouterLink @click="exitFullscreen" to="/about">About</RouterLink>
+    <RouterLink @click="exitFullscreen" to="/play-online">Play Online</RouterLink>
+    <RouterLink @click="goFullscreen" to="/play-cpu">Play CPU</RouterLink>
+    <RouterLink @click="goFullscreen" to="/replay">Replay</RouterLink>
   </nav>
   <RouterView />
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { getCursorType } from '@/util'
 import { ref, watch } from 'vue'
-import { goFullScreen } from '@/util'
+import { goFullscreen } from '@/util'
 
 const name = ref(localStorage.getItem('name') ?? '')
 
@@ -21,7 +21,7 @@ watch(cursorType, (newValue) => localStorage.setItem('cursorType', newValue))
     <input id="name" type="text" v-model="name" />
     <h2><router-link to="play-online">Click here to play online</router-link></h2>
     <h2>
-      <router-link @click="goFullScreen" to="play-cpu">Click here to play offline</router-link>
+      <router-link @click="goFullscreen" to="play-cpu">Click here to play offline</router-link>
     </h2>
     <h2>Notes about the beta version</h2>
     <p>Things are a still a bit rough around here...</p>
