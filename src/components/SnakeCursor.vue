@@ -218,6 +218,15 @@ function onMouseUp(event: MouseEvent) {
 let firstTouchIdentifier: number | null = null
 
 function onTouchStart(event: TouchEvent) {
+  if (firstTouchIdentifier !== null) {
+    // Failsafe to recover from an inconsistent state
+    for (const touch of event.changedTouches) {
+      if (touch.identifier === firstTouchIdentifier) {
+        firstTouchIdentifier = null
+      }
+    }
+    return
+  }
   for (const touch of event.changedTouches) {
     const coords = containerCoords(touch.clientX, touch.clientY)
 
