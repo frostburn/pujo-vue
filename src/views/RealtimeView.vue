@@ -11,7 +11,8 @@ import {
   TimeWarpingMirror,
   type PlayedMove,
   OnePlayerGame,
-  HEIGHT
+  HEIGHT,
+  type MultiplayerParams
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import type { ServerMessage } from '@/server-api'
@@ -91,30 +92,18 @@ function onMessage(message: ServerMessage) {
     console.log(message, identity)
   }
   if (message.type === 'game params') {
+    replay = prepareReplay(message)
     identity = message.identity
     forfeited = false
-    const screenSeeds = [...message.screenSeeds]
-    const colorSelections = [...message.colorSelections]
-    const initialBags = [...message.initialBags]
-    if (identity) {
-      screenSeeds.reverse()
-      colorSelections.reverse()
-      initialBags.reverse()
+    const params: MultiplayerParams = {
+      ...replay.params,
+      bagSeeds: null
     }
-    const origin = new DeckedGame(
-      null,
-      screenSeeds,
-      colorSelections,
-      initialBags,
-      message.targetPoints,
-      message.marginFrames,
-      message.mercyFrames
-    )
+    const origin = new DeckedGame(params)
     mirror = new TimeWarpingMirror(origin, CHECKPOINT_INTERVAL, MAX_CHECKPOINTS)
-    game = origin.clone(true)
+    game = origin.clone()
     lastMove = null
 
-    replay = prepareReplay(message)
     for (let i = 0; i < replay.metadata.names.length; ++i) {
       names[i] = replay.metadata.names[i]
     }
@@ -223,12 +212,13 @@ function onMessage(message: ServerMessage) {
     }
     canRequeue.value = true
     // Construct a virtual server to keep playing
-    surrogate = new OnePlayerGame(
-      replay.gameSeeds[0],
-      replay.screenSeeds[0],
-      replay.colorSelections[0],
-      replay.initialBags[0]
-    )
+    surrogate = new OnePlayerGame({
+      bagSeed: replay.params.bagSeeds[0],
+      garbageSeed: replay.params.garbageSeeds[0],
+      colorSelection: replay.params.colorSelections[0],
+      initialBag: replay.params.initialBags[0],
+      rules: replay.params.rules
+    })
     mirror!.bags[0] = surrogate.initialBag
     for (const move of replay.moves) {
       if (move.player === 0) {
@@ -302,7 +292,7 @@ function requeue() {
 function commitMove(x1: number, y1: number, orientation: number, hardDrop: boolean) {
   if (game && replay) {
     const move = game.play(0, x1, y1, orientation, hardDrop)
-    if (replay.gameSeeds[0] === -1) {
+    if (replay.params.bagSeeds[0] === -1) {
       websocket.makeRealtimeMove(move.x1, move.y1, move.orientation, false, move.time)
     } else {
       replay.moves.push(move)

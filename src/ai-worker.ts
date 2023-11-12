@@ -1,6 +1,5 @@
 import {
-  JIGGLE_TIME,
-  JKISS32,
+  DEFAULT_JIGGLE_FRAMES,
   SimpleGame,
   SimplePuyoScreen,
   flexDropletStrategy1,
@@ -38,14 +37,13 @@ onmessage = (e) => {
   const gameData = e.data.game
 
   // Revive the class instance.
-  const screen = new SimplePuyoScreen()
+  const screen = new SimplePuyoScreen(gameData.screen.jkiss.state, gameData.screen.rules)
   screen.grid = gameData.screen.grid
   screen.bufferedGarbage = gameData.screen.bufferedGarbage
-  screen.jkiss = new JKISS32(gameData.screen.jkiss.state)
-  const moveTime =
+  const moveTime: number =
     Math.max(0, thinking.totalFrames / thinking.samples - e.data.anticipation) +
     (e.data.hardDrop ? 1 : FALL_FRAMES) +
-    JIGGLE_TIME +
+    DEFAULT_JIGGLE_FRAMES +
     e.data.throttleFrames
   const game = new SimpleGame(
     screen,
@@ -57,6 +55,7 @@ onmessage = (e) => {
     gameData.lateTimeRemaining,
     gameData.colorSelection,
     gameData.bag,
+    gameData.rules,
     moveTime
   )
   const start = performance.now()

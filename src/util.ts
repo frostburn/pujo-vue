@@ -6,7 +6,8 @@ import {
   YELLOW,
   type ApplicationInfo,
   type Replay,
-  parseReplay
+  parseReplay,
+  type ReplayParams
 } from 'pujo-puyo-core'
 import { name, version } from '../package.json'
 import { packages } from '../package-lock.json'
@@ -167,14 +168,12 @@ export function getCursorType(): CursorType {
 
 // Prepare partial replay from game parameters
 export function prepareReplay(message: GameParams): Replay {
+  const params: ReplayParams = {
+    ...message.params,
+    bagSeeds: [-1, -1]
+  }
   const replay: Replay = {
-    gameSeeds: [-1, -1],
-    screenSeeds: [...message.screenSeeds],
-    colorSelections: message.colorSelections.map((cs) => [...cs]),
-    initialBags: message.initialBags.map((ib) => [...ib]),
-    targetPoints: [...message.targetPoints],
-    marginFrames: message.marginFrames,
-    mercyFrames: message.mercyFrames,
+    params,
     moves: [],
     metadata: { ...message.metadata },
     result: {
@@ -189,10 +188,10 @@ export function prepareReplay(message: GameParams): Replay {
     replay.metadata.clients = [...replay.metadata.clients]
   }
   if (message.identity) {
-    replay.screenSeeds.reverse()
-    replay.colorSelections.reverse()
-    replay.initialBags.reverse()
-    replay.targetPoints.reverse()
+    replay.params.garbageSeeds.reverse()
+    replay.params.colorSelections.reverse()
+    replay.params.initialBags.reverse()
+    replay.params.rules.targetPoints.reverse()
     replay.metadata.names.reverse()
     replay.metadata.elos.reverse()
     if (replay.metadata.clients) {
@@ -204,11 +203,11 @@ export function prepareReplay(message: GameParams): Replay {
 }
 
 export function finalizeReplay(replay: Replay, message: GameResult, identity: number): void {
-  replay.gameSeeds = [...message.gameSeeds]
-  replay.initialBags = message.initialBags.map((ib) => [...ib])
+  replay.params.bagSeeds = [...message.bagSeeds]
+  replay.params.initialBags = message.initialBags.map((ib) => [...ib])
   if (identity) {
-    replay.gameSeeds.reverse()
-    replay.initialBags.reverse()
+    replay.params.bagSeeds.reverse()
+    replay.params.initialBags.reverse()
   }
   replay.result.reason = message.reason
   replay.metadata.endTime = message.msSince1970
@@ -258,5 +257,10 @@ export function loadReplay(age = 0) {
   if (!serialized) {
     return undefined
   }
-  return parseReplay(serialized)
+  try {
+    return parseReplay(serialized)
+  } catch {
+    // TODO: This should probably be based on versioning...
+    return undefined
+  }
 }

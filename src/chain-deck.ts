@@ -3,9 +3,8 @@ import {
   type GameState,
   MultiplayerGame,
   GHOST_Y,
-  DEFAULT_MARGIN_FRAMES,
-  DEFAULT_MERCY_FRAMES,
-  type MultiplayerTickResult
+  type MultiplayerTickResult,
+  type MultiplayerParams
 } from 'pujo-puyo-core'
 
 export type Chain = {
@@ -82,16 +81,8 @@ export class ChainDeck {
 export class DeckedGame extends MultiplayerGame {
   deck: ChainDeck
 
-  constructor(
-    seeds?: number[] | null | null[],
-    screenSeeds?: number[],
-    colorSelections?: number[][],
-    initialBags?: number[][],
-    targetPoints?: number[],
-    marginFrames = DEFAULT_MARGIN_FRAMES,
-    mercyFrames = DEFAULT_MERCY_FRAMES
-  ) {
-    super(seeds, screenSeeds, colorSelections, initialBags, targetPoints, marginFrames, mercyFrames)
+  constructor(params: MultiplayerParams) {
+    super(params)
     this.deck = new ChainDeck()
   }
 
@@ -101,8 +92,8 @@ export class DeckedGame extends MultiplayerGame {
     return results
   }
 
-  clone(preserveSeed = false) {
-    const result = super.clone(preserveSeed)
+  clone() {
+    const result = super.clone()
     result.deck = this.deck.clone()
     return result
   }
