@@ -10,7 +10,8 @@ import {
   type Replay,
   FischerTimer,
   OnePlayerGame,
-  HEIGHT
+  HEIGHT,
+  type MultiplayerParams
 } from 'pujo-puyo-core'
 import { type Chain, DeckedGame } from '@/chain-deck'
 import { processTickSounds } from '@/soundFX'
@@ -80,24 +81,12 @@ function onMessage(message: ServerMessage) {
   }
   if (message.type === 'game params') {
     identity = message.identity
-    const screenSeeds = [...message.screenSeeds]
-    const colorSelections = [...message.colorSelections]
-    const initialBags = [...message.initialBags]
-    if (identity) {
-      screenSeeds.reverse()
-      colorSelections.reverse()
-      initialBags.reverse()
-    }
-    game = new DeckedGame(
-      null,
-      screenSeeds,
-      colorSelections,
-      initialBags,
-      message.targetPoints,
-      message.marginFrames,
-      message.mercyFrames
-    )
     replay = prepareReplay(message)
+    const params: MultiplayerParams = {
+      ...replay.params,
+      bagSeeds: null
+    }
+    game = new DeckedGame(params)
     for (let i = 0; i < replay.metadata.names.length; ++i) {
       names[i] = replay.metadata.names[i]
     }
@@ -192,12 +181,13 @@ function onMessage(message: ServerMessage) {
     referenceAge = 0
     if (game) {
       // This is basically brain surgery just to keep playing
-      const surrogate = new OnePlayerGame(
-        replay.gameSeeds[0],
-        replay.screenSeeds[0],
-        replay.colorSelections[0],
-        replay.initialBags[0]
-      )
+      const surrogate = new OnePlayerGame({
+        bagSeed: replay.params.bagSeeds[0],
+        garbageSeed: replay.params.garbageSeeds[0],
+        colorSelection: replay.params.colorSelections[0],
+        initialBag: replay.params.initialBags[0],
+        rules: replay.params.rules
+      })
       for (const move of replay.moves) {
         if (move.player === 0) {
           surrogate.advanceColors()

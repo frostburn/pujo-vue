@@ -4,16 +4,13 @@ import PlayingField from '@/components/PlayingField.vue'
 import PlayingButton from '@/components/PlayingButton.vue'
 import {
   MOVES,
-  randomColorSelection,
-  randomSeed,
   type GameState,
   type Replay,
   type StrategyResult,
   HEIGHT,
   WIDTH,
   PASS,
-  DEFAULT_TARGET_POINTS,
-  randomBag
+  randomMultiplayer
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useAudioContextStore } from '@/stores/audio-context'
@@ -96,32 +93,12 @@ const countdown = ref(3)
 let countDownId: number | null = null
 
 let lastAgeDrawn = -1
-const gameSeeds = [randomSeed(), randomSeed()]
-let colorSelection = randomColorSelection()
-const colorSelections = [colorSelection, colorSelection]
-const screenSeeds = [randomSeed(), randomSeed()]
-let initialBag = randomBag(colorSelection)
-const initialBags = [initialBag, initialBag]
-const targetPoints = [DEFAULT_TARGET_POINTS, DEFAULT_TARGET_POINTS]
-const marginFrames = Infinity
-const mercyFrames = Infinity
-let game = new DeckedGame(
-  gameSeeds,
-  screenSeeds,
-  colorSelections,
-  initialBags,
-  targetPoints,
-  marginFrames,
-  mercyFrames
-)
+let params = randomMultiplayer()
+params.rules.marginFrames = Infinity
+params.rules.mercyFrames = Infinity
+let game = new DeckedGame(params)
 const replay: Replay = {
-  gameSeeds: [...gameSeeds],
-  screenSeeds: [...screenSeeds],
-  colorSelections: [...colorSelections],
-  initialBags: [...initialBags],
-  targetPoints,
-  marginFrames,
-  mercyFrames,
+  params,
   moves: [],
   metadata: {
     event: 'Local Play vs. CPU',
@@ -363,29 +340,11 @@ function restart(save = true) {
   workerStrategy = null
   workerThrottleRemaining = difficulty.value.throttleFrames
   lastAgeDrawn = -1
-  gameSeeds[0] = randomSeed()
-  gameSeeds[1] = randomSeed()
-  colorSelection = randomColorSelection()
-  colorSelections[0] = colorSelection
-  colorSelections[1] = colorSelection
-  screenSeeds[0] = randomSeed()
-  screenSeeds[1] = randomSeed()
-  initialBag = randomBag(colorSelection)
-  initialBags[0] = initialBag
-  initialBags[1] = initialBag
-  game = new DeckedGame(
-    gameSeeds,
-    screenSeeds,
-    colorSelections,
-    initialBags,
-    targetPoints,
-    marginFrames,
-    mercyFrames
-  )
-  replay.gameSeeds = [...gameSeeds]
-  replay.screenSeeds = [...screenSeeds]
-  replay.colorSelections = [...colorSelections]
-  replay.initialBags = [...initialBags]
+  params = randomMultiplayer()
+  params.rules.marginFrames = Infinity
+  params.rules.mercyFrames = Infinity
+  game = new DeckedGame(params)
+  replay.params = params
   replay.moves.length = 0
   replay.metadata.priorWins = [...wins]
   replay.metadata.round++

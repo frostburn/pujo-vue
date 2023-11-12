@@ -5,12 +5,17 @@ import {
   ReplayMetadata,
   ReplayResult,
   SimpleGame,
-  PlayedMove
+  PlayedMove,
+  ReplayParams
 } from 'pujo-puyo-core'
 
 // Generic types
 
 type GameType = Replay['metadata']['type']
+
+interface PartialParams extends ReplayParams {
+  bagSeeds: null
+}
 
 type Challenge = {
   uuid: string
@@ -182,12 +187,7 @@ interface ServerRealtimeMove extends PlayedMove {
 
 type GameParams = {
   type: 'game params'
-  colorSelections: Replay['colorSelections']
-  screenSeeds: Replay['screenSeeds']
-  targetPoints: Replay['targetPoints']
-  marginFrames: Replay['marginFrames']
-  mercyFrames: Replay['mercyFrames']
-  initialBags: number[][]
+  params: PartialParams
   identity: number
   metadata: ReplayMetadata
 }
@@ -207,8 +207,8 @@ type GameResult = {
   winner: ReplayResult['winner']
   reason: ReplayResult['reason']
   msSince1970: ReplayMetadata['endTime']
-  gameSeeds: Replay['gameSeeds']
-  initialBags: Replay['initialBags']
+  bagSeeds: Replay['params']['bagSeeds']
+  initialBags: Replay['params']['initialBags']
 }
 
 type SimpleState = {

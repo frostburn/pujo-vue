@@ -8,7 +8,8 @@ import {
   type MultiplayerTickResult,
   WIDTH,
   NOMINAL_FRAME_RATE,
-  repairReplay
+  repairReplay,
+  randomMultiplayer
 } from 'pujo-puyo-core'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SVGDefs from '@/components/SVGDefs.vue'
@@ -34,7 +35,7 @@ const audioContext = useAudioContextStore()
 
 const replay = ref<Replay | null>(null)
 
-let game = new DeckedGame()
+let game = new DeckedGame(randomMultiplayer())
 let replayIndex = 0
 
 const snapshots: DeckedGame[] = []
@@ -49,7 +50,7 @@ function takeSnapshot(g: MultiplayerGame, tickResults_: MultiplayerTickResult[])
     }
   }
   if (!(g.age % SNAPSHOT_INTERVAL)) {
-    snapshots.push(g.clone(true) as DeckedGame)
+    snapshots.push(g.clone() as DeckedGame)
   }
 }
 
@@ -73,7 +74,7 @@ const userIds = reactive<(number | null)[]>([null, null])
 function setReplay(newValue: Replay) {
   replay.value = newValue
   replayIndex = 0
-  game = new DeckedGame()
+  game = new DeckedGame(randomMultiplayer())
   timeModel.value = 0
   frameRate.value = 0
   timeouts.fill(false)
@@ -99,15 +100,7 @@ const track = computed(() => {
   }
 
   const r = replay.value
-  game = new DeckedGame(
-    r.gameSeeds,
-    r.screenSeeds,
-    r.colorSelections,
-    r.initialBags,
-    r.targetPoints,
-    r.marginFrames,
-    r.mercyFrames
-  )
+  game = new DeckedGame(r.params)
 
   const result = [...replayToTrack(r, takeSnapshot, DeckedGame)]
   return result
@@ -184,7 +177,7 @@ const gameAndDeckStates = computed<[GameState[], ChainDeck]>(() => {
         break
       }
     }
-    game = snapshots[i - 1].clone(true)
+    game = snapshots[i - 1].clone()
     replayIndex = 0
     while (
       replayIndex < replay.value.moves.length &&
